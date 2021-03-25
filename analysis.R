@@ -1,6 +1,7 @@
 # Udpate packages
-install_github("energyandcleanair/rcrea", upgrade=F)
-install_github("energyandcleanair/creatrajs", upgrade=F)
+# require(remotes)
+# remotes::install_github("energyandcleanair/rcrea", upgrade=F)
+# remotes::install_github("energyandcleanair/creatrajs", upgrade=F)
 
 library(rcrea)
 library(remotes)
@@ -67,7 +68,7 @@ ggplot(meas.hp %>%
          # distinct(gadm1_name,date) %>%
          group_by(gadm1_name,date=lubridate::floor_date(date, "week")) %>%
          summarise(heavy_pollution=sum(heavy_pollution))
-         ) +
+) +
   # geom_tile(aes(date,y=0,fill=heavy_pollution)) +
   geom_bar(aes(date, heavy_pollution),
            stat="identity") +
@@ -84,22 +85,72 @@ ggplot(meas.hp %>%
 ggsave(file.path("results","plots","province.occurence.png"),
        width=8, height=6)
 
-# Calculate trajectories --------------------------------------------------
 
-meas.hp %>%
+
+
+# Deweather --------------------------------------------------
+# You need a folder with meteorological files
+# defined by DIR_HYSPLIT_MET
+# Otherwise it will download all files which might take quite some time
+location_ids <- unique(meas.hp$location_id)
+
+m.dew <- creadeweather::deweather(
+  location_id=location_id,
+  poll="pm25",
+  add_fire=F,
+  calc_fire=T,
+  output=c("trend", "anomaly"),
+  fire_mode="trajectory",
+  training_start_anomaly = lubridate::date(date_from)-lubridate::years(3), # Three years of training
+  training_end_anomaly = lubridate::date(date_from)-lubridate::days(1), # We end training just before 2020 winter
+  save_weather_filename = file.path("results","data","deweathered",sprintf("weather.%s.RDS",location_id))
+  save_trajs_filename = file.path("results","data","deweathered",sprintf("trajs.%s.RDS",location_id))
+  )
+
+saveRDS(m.dew, file.path("results","data","deweathered",sprintf("meas.%s.RDS",location_id)))
+
+
+
+# Calculate trajectories --------------------------------------------------
+# You need a folder with meteorological files
+# defined by DIR_HYSPLIT_MET
+# Otherwise it will download all files which might take quite some time
+duration_hour=72
+met_type="gdas1"
+height=500
+
+meas.hp.trajs <- meas.hp %>%
   filter(heavy_pollution) %>%
   rowwise() %>%
-  mutate(trajs=list(
-    creatrajs::trajs.get(
-      dates=as.Date(date),
-      location_id=location_id,
-      geometry=geometry,
-      met_type="gdas1",
-      heights=500,
-      duration_hour=72,
-      timezone="Asia/Shanghai",
-      cache_folder=file.path("cache","trajs"),
-      parallel=F
-    )
-  ))
+  mutate(meas=list(tibble(pm25=pm25, pm10=pm10)),
+         filename=file.path("results","plots",
+                            paste(location_id,date,"png",sep=".")))
 
+meas.hp.trajs$trajs <- creatrajs::trajs.get(
+  dates=meas.hp.trajs$date,
+  location_id=meas.hp.trajs$location_id,
+  geometry=meas.hp.trajs$geometry,
+  duration_hour=duration_hour,
+  met_type=met_type,
+  height=height,
+  timezone="Asia/Shanghai",
+  cache_folder=file.path("cache","trajs"), # Trajectories files are cached here. Won't be recomputed if exist
+  parallel=F
+)
+
+# Add basemap
+meas.hp.trajs <- creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 200, zoom_level = 8)
+
+mapply(
+  creatrajs::map.trajs,
+  trajs = meas.hp.trajs$trajs,
+  basemap = meas.hp.trajs$basemap,
+  location_id = meas.hp.trajs$location_id,
+  location_name = meas.hp.trajs$location_name,
+  date=meas.hp.trajs$date,
+  meas=list(NULL),
+  duration_hour=duration_hour,
+  met_type=met_type,
+  height=height,
+  filename=meas.hp.trajs$filename,
+  SIMPLIFY=F)
