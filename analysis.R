@@ -13,47 +13,47 @@ dir.create(file.path("results","data"), recursive=T, showWarnings=F)
 dir.create(file.path("results","plots"), recursive=T, showWarnings=F)
 dir.create(file.path("cache","trajs"), recursive=T, showWarnings=F)
 
+
+
 date_from <- "2020-10-01"
 date_to <- "2021-03-31"
+
+years_rel <- seq(0,-4)
+
 polls <- c("pm25","pm10")
-
-is_heavy_poll <- function(pm25, pm10, ...){
-  (pm25>150) &
-    (pm25/pm10 < 0.75)
-}
-
 
 # Find most polluted cities and dates ------------------------------------------
 
 # Get measurements (takes 3min roughly)
-tic()
-meas <- rcrea::measurements(
-  date_from=date_from,
-  date_to=date_to,
-  source="mee",
-  deweathered=F,
-  poll=polls,
-  with_metadata=T,
-  with_geometry=T
-)
-toc()
+if(FALSE){
+  tic()
+  meas <- do.call("bind_rows",
+                  lapply(years_rel, function(year_rel){
+                    print(year_rel)
+                    rcrea::measurements(
+                      date_from=lubridate::date(date_from)+lubridate::years(year_rel),
+                      date_to=lubridate::date(date_to)+lubridate::years(year_rel),
+                      source="mee",
+                      deweathered=F,
+                      poll=polls,
+                      with_metadata=T,
+                      with_geometry=T
+                    ) %>%
+                      mutate(season=paste(
+                        lubridate::year(date_from)+year_rel,
+                        lubridate::year(date_from)+year_rel+1,
+                        sep="-"))
+                  }))
+  toc()
+  saveRDS(meas, file.path("results","data","meas.RDS"))
 
-saveRDS(meas, file.path("results","data","meas.RDS"))
+}else{
+  meas <- readRDS(file.path("results","data","meas.RDS"))
+}
 
 
-# Find city for each province that has the highest pollution levels / most heavy pollution days
-meas.hp <- meas %>%
-  filter(process_id=="city_day_mad") %>%
-  tidyr::spread("poll","value") %>%
-  mutate(heavy_pollution=is_heavy_poll(pm25=pm25, pm10=pm10))
 
-meas.hp.count <- meas.hp %>%
-  group_by(location_id, location_name, gadm1_id, gadm1_name) %>%
-  summarise(days_all=n(),
-            days_polluted=sum(heavy_pollution)) %>%
-  filter(days_polluted>0) %>%
-  group_by(gadm1_id) %>%
-  arrange(desc(days_polluted))
+
 
 write.csv(meas.hp.count %>% select(location_name, gadm1_name, days_polluted, days_all),
           file.path("results","data","meas.hp.count.csv"), row.names=F)
@@ -63,10 +63,10 @@ write.csv(meas.hp.count %>% select(location_name, gadm1_name, days_polluted, day
 
 # Heavy polluted days by province
 ggplot(meas.hp %>%
-         group_by(gadm1_name, date) %>%
+         group_by(gadm1_name, season, date) %>%
          summarise(heavy_pollution=(sum(heavy_pollution)>=1)) %>%
          # distinct(gadm1_name,date) %>%
-         group_by(gadm1_name,date=lubridate::floor_date(date, "week")) %>%
+         group_by(gadm1_name, season, date=lubridate::floor_date(date, "week")) %>%
          summarise(heavy_pollution=sum(heavy_pollution))
 ) +
   # geom_tile(aes(date,y=0,fill=heavy_pollution)) +
