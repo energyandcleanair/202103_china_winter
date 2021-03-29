@@ -13,9 +13,11 @@ ui <- navbarPage(
     id = "nav-page",
 
     source(file.path("ui", "tab_summary.R"),  local = TRUE)$value,
+    source(file.path("ui", "tab_table.R"),  local = TRUE)$value,
+    source(file.path("ui", "tab_trajectories.R"),  local = TRUE)$value,
     source(file.path("ui", "tab_measurements.R"),  local = TRUE)$value,
-    source(file.path("ui", "tab_deweather.R"),  local = TRUE)$value,
-    source(file.path("ui", "tab_trajectories.R"),  local = TRUE)$value
+    source(file.path("ui", "tab_deweather.R"),  local = TRUE)$value
+
 )
 
 

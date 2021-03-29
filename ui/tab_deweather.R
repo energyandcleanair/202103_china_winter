@@ -4,7 +4,7 @@ tabPanel("Weather",
          sidebarLayout(
            mainPanel(
              width=10,
-             plotlyOutput("plots", height='calc(100vh - 60px)') %>% withSpinner(color="#0dc5c1")#"calc(100% - 300px)")
+             plotlyOutput("plots", height='calc(100vh - 80px)') %>% withSpinner(color="#0dc5c1")#"calc(100% - 300px)")
 
            #   leafletOutput("maptrajs", height = "calc(100%)"),
            #   absolutePanel(left=25,

@@ -15,7 +15,6 @@
 
 .navbar {
   padding: 0 !important;
-  margin-bottom: 0 !important;
 }
 
 .well {
@@ -27,6 +26,7 @@
 .no-padding-tab>.row>* {
   padding-left: 0;
   padding-right: 0;
+  margin-top: -20px;
 }
 
 .btn{

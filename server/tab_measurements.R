@@ -74,16 +74,25 @@
 
 # Output Elements --------------------------------------
 
+output$selectInputMeasProvince <- renderUI({
+  provinces <- meas_locations()$gadm1_name %>% unique()
+  pickerInput("meas_province","Province", choices=provinces, options = list(`actions-box` = TRUE), multiple = F)
+})
 
 output$measPlots <- renderPlotly({
   req(meas_all())
+  req(meas_locations())
+  req(input$meas_province)
   req(input$meas_running_width)
 
   poll <- rcrea::poll_str(meas_all()$poll[1])
+
   unit <- meas_all()$unit[1]
   hovertemplate <- paste('%{y:.0f}',unit)
 
   m <- meas_all() %>%
+    left_join(meas_locations() %>% select(location_id=id, gadm1_name)) %>%
+    filter(gadm1_name==input$meas_province) %>%
     select(location_id, date, observed, predicted, anomaly=value) %>%
     dplyr::left_join(meas_locations() %>% select(location_id=id, location_name=name, province=gadm1_name))
 

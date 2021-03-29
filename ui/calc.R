@@ -1,7 +1,7 @@
 
 calc.is_heavy_poll <- function(pm25, pm10, ...){
   (pm25>150) &
-    (pm25/pm10 < 0.75)
+    (pm25/pm10 >= 0.75)
 }
 
 

@@ -272,7 +272,7 @@ add_sentinel_layers <- function(map, date){
 output$maptrajs <- renderLeaflet({
   map <- leaflet(options = leafletOptions(preferCanvas = TRUE,
                                           zoomControl = FALSE)) %>%
-    setView(80,30,6) %>%
+    setView(116,40,6) %>%
     # addProviderTiles(providers$Stamen.TonerLite,
     #                  options = providerTileOptions(noWrap = TRUE)
     # )

@@ -25,8 +25,9 @@ polls <- c("pm25","pm10")
 # Find most polluted cities and dates ------------------------------------------
 
 # Get measurements (takes 3min roughly)
-if(FALSE){
+if(T){
   tic()
+  # Version 1: MEAN of mad filtered stations in each city
   meas <- do.call("bind_rows",
                   lapply(years_rel, function(year_rel){
                     print(year_rel)
@@ -37,18 +38,78 @@ if(FALSE){
                       deweathered=F,
                       poll=polls,
                       with_metadata=T,
-                      with_geometry=T
+                      with_geometry=F
                     ) %>%
                       mutate(season=paste(
                         lubridate::year(date_from)+year_rel,
                         lubridate::year(date_from)+year_rel+1,
-                        sep="-"))
+                        sep="-")) %>%
+                      ungroup()
                   }))
   toc()
   saveRDS(meas, file.path("results","data","meas.RDS"))
 
+  # Version 2: MAX of mad filtered stations in each city
+  tic()
+  meas2 <- do.call("bind_rows",
+                  lapply(years_rel, function(year_rel){
+                    print(year_rel)
+                    rcrea::measurements(
+                      date_from=lubridate::date(date_from)+lubridate::years(year_rel),
+                      date_to=lubridate::date(date_to)+lubridate::years(year_rel),
+                      source="mee",
+                      process_id="station_day_mad",
+                      poll=polls,
+                      with_metadata=T,
+                      with_geometry=F,
+                      collect=F
+                    ) %>%
+                      group_by(location_id=city_id, location_name=city_name,
+                               gadm1_id, gadm1_name,
+                               date, process_id, unit, poll, timezone) %>%
+                      summarise(value=max(value, na.rm=T)) %>%
+                      collect() %>%
+                      mutate(season=paste(
+                        lubridate::year(date_from)+year_rel,
+                        lubridate::year(date_from)+year_rel+1,
+                        sep="-")) %>%
+                      ungroup()
+                  }))
+  toc()
+  saveRDS(meas2, file.path("results","data","meas2.RDS"))
+
+  # Version 3: MAX of unfiltered stations in each city
+  tic()
+  meas3 <- do.call("bind_rows",
+                    lapply(years_rel, function(year_rel){
+                      print(year_rel)
+                      rcrea::measurements(
+                        date_from=lubridate::date(date_from)+lubridate::years(year_rel),
+                        date_to=lubridate::date(date_to)+lubridate::years(year_rel),
+                        source="mee",
+                        process_id="raw",
+                        poll=polls,
+                        with_metadata=T,
+                        with_geometry=F,
+                        collect=F
+                      ) %>%
+                        group_by(location_id=city_id, location_name=city_name,
+                                 gadm1_id, gadm1_name,
+                                 date, process_id, unit, poll, timezone) %>%
+                        summarise(value=max(value, na.rm=T)) %>%
+                        collect() %>%
+                        mutate(season=paste(
+                          lubridate::year(date_from)+year_rel,
+                          lubridate::year(date_from)+year_rel+1,
+                          sep="-"))
+                    }))
+  toc()
+  saveRDS(meas3, file.path("results","data","meas3.RDS"))
+
 }else{
   meas <- readRDS(file.path("results","data","meas.RDS"))
+  meas2 <- readRDS(file.path("results","data","meas2.RDS"))
+  meas3 <- readRDS(file.path("results","data","meas3.RDS"))
 }
 
 

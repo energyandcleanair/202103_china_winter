@@ -4,10 +4,11 @@ tabPanel("Measurements",
          sidebarLayout(
            mainPanel(
              width=10,
-             plotlyOutput("measPlots", height='calc(100vh - 60px)') %>% withSpinner(color="#0dc5c1")
+             plotlyOutput("measPlots", height='calc(100vh - 80px)') %>% withSpinner(color="#0dc5c1")
            ),
            sidebarPanel(
              width = 2,
+             uiOutput("selectInputMeasProvince"),
              # div(
              #   class="row-inline",
              #   height=50,

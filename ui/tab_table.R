@@ -1,26 +1,13 @@
-tabPanel("Summary",
-         value="summary",
+tabPanel("Table",
+         value="table",
+         # class = "no-padding-tab",
+         DT::dataTableOutput("tableHpCountLocation") %>% withSpinner(color="#0dc5c1"),
          div(
            class="row-inline",
-           height=50,
-           numericInput(
-             "threshold_pm25",
-             "PM2.5 >=",
-             150,
-             min = 0,
-             max = 1000
-           ),
-           numericInput(
-             "threshold_pm25_pm10",
-             "PM2.5 / PM10 >=",
-             0.75,
-             min = 0,
-             max = 1000
-           )
-         ),
-         # class = "no-padding-tab",
-         plotlyOutput("plotHpCountProvince", height="calc(100vh - 110px)")  %>% withSpinner(color="#0dc5c1")
-
+           style="width: unset;",
+           downloadButton("downloadObservations", "Download observations (PM2.5 & PM10)"),
+           downloadButton("downloadDeweathered", "Download deweathered (PM2.5)")
+         )
 )
 # tabPanel("Trajectories", value="trajectories", fluid = TRUE,
 #          sidebarLayout(
