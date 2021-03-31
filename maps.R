@@ -50,6 +50,8 @@ map.change_city <- function(m.change.city,
                             width=10,
                             height=10){
 
+  g <- data.gadm()
+
   m.change.city.sf <- m.change.city %>%
     left_join(rcrea::cities(id=unique(m.change.city$location_id),
                             with_geometry=T) %>%
@@ -116,10 +118,10 @@ map.change_interpolated <- function(meas, res=0.1){
   r <- raster::raster(g, resolution=res)
 
 
-  library(gstat)
-  library(magrittr)
-  library(rasterVis)
-  library(sp)
+  # library(gstat)
+  # library(magrittr)
+  # library(rasterVis)
+  # library(sp)
   # r.idw.new1 <- gstat::idw(new1 ~ 1, as(m.city.sf %>% filter(!is.na(new1)), "Spatial"), newdata=as(r, "SpatialPixels")) %>% raster::raster() %>% raster::mask(g)
 
   r.interp.new1 <- utils.interp.ok(r, m.city.sf %>% rename(value=new1), mask=g)
@@ -131,15 +133,20 @@ map.change_interpolated <- function(meas, res=0.1){
   r.change4 <- r.interp.new4/r.interp.old4 -1
 
   d.plot <- list(r.change4, r.change1) %>%
-    lapply(function(x) x %>% min(.25) %>% max(-.25) %>% multiply_by(100)) %>% raster::stack()
+    lapply(function(x) x %>% min(.6) %>% max(-.6) %>% multiply_by(100)) %>% raster::stack()
 
   (plt.contour <-  d.plot %>%
-    rasterVis::levelplot(names.attr=c("2020Q4 vs 2019Q4", "2021Q1 vs 2020Q1"),
-                         main=NULL, xlab=NULL, ylab=NULL,
+    rasterVis::levelplot(names.attr=c(
+      "2020Q4 vs 2019Q4",
+      "2021Q1 vs 2020Q1"),
+                         main=NULL,
+       xlab=NULL, ylab=NULL,
+      scales=list(x=list(draw=F),
+                  y=list(draw=FALSE)),
                          par.settings = rasterVis::BuRdTheme(
                            layout.widths = list(axis.key.padding = 0,
                                                 ylab.right = 2)),
-                         at=seq(-0.25*100, 0.25*100, length.out=100),
+                         at=seq(-0.6*100, 0.6*100, length.out=100),
                          ylab.right = "Change in percentage"
 
     )  +
