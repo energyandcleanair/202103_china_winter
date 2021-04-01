@@ -3,6 +3,7 @@
 # remotes::install_github("energyandcleanair/rcrea", upgrade=F)
 # remotes::install_github("energyandcleanair/creatrajs", upgrade=F)
 
+library(magrittr)
 library(rcrea)
 library(remotes)
 library(creatrajs)
@@ -12,7 +13,7 @@ library(sf)
 library(pbapply)
 library(sp)
 library(rasterVis)
-
+library(gstat)
 
 dir.create(file.path("results","data"), recursive=T, showWarnings=F)
 dir.create(file.path("results","plots"), recursive=T, showWarnings=F)
@@ -100,21 +101,21 @@ m.hp.city <- meas %>%
          date>="2020-04-01") %>%
   group_by(city=location_name, province=gadm1_name) %>%
   summarise(count=n())
-write.csv(m.hp.city, "results/data/heavy_polluted_per_city.csv")
+write.csv(m.hp.city, "results/data/heavy_polluted_per_city.csv", row.names = F)
 
 
 m.hp.worsecity <- m.hp.city %>%
   group_by(province) %>%
   filter(count==max(count)) %>%
   rename(worse_city=city)
-write.csv(m.hp.city, "results/data/heavy_polluted_per_province.csv")
+write.csv(m.hp.worsecity, "results/data/heavy_polluted_per_province.csv", row.names = F)
 
 
 # back trajectories for the heavy polluted days, for the worst city in each province and for provincial capitals
 
 capitals <- read_csv(file.path("data","cities.csv")) %>%
   filter(capital %in% c("primary","admin")) %>%
-  select(location_name=city,
+  dplyr::select(location_name=city,
          gadm1_name=admin_name) %>%
   mutate(location_name=recode(location_name,
                               "Ürümqi"="Urumqi",
@@ -173,8 +174,8 @@ meas.hp.trajs$trajs <- creatrajs::trajs.get(
 # Add basemap
 meas.hp.trajs.all <-
   bind_rows(
-    creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 200, zoom_level = 8) %>% mutate(buffer_km=200),
-    creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 500, zoom_level = 7) %>% mutate(buffer_km=500)
+    creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 800, zoom_level = 7) %>% mutate(buffer_km=800)
+    # creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 500, zoom_level = 7) %>% mutate(buffer_km=500)
     )
 
 meas.hp.trajs.all$filename=file.path("results","maps","trajs",

@@ -1,98 +1,123 @@
 require(creadeweather)
+require(pbapply)
 
 date_from <- "2020-10-01"
 date_to <- "2021-03-31"
 training_end <- lubridate::date(date_from)-lubridate::years(1)-lubridate::days(1)
 training_start <- training_end - lubridate::years(3)
 
-m.dew <- creadeweather::deweather(
+# Get observed measurements and remove sand storms before deweathering
+m <- rcrea::measurements(
+  date_from=training_start,
   source="mee",
-  poll="pm25",
-  output=c("trend","anomaly"),
-  training_start_anomaly = training_start,
-  training_end_anomaly = training_end,
-  upload_results = F
-)
+  poll=c("pm25","pm10"),
+  process_id="city_day_mad",
+  with_geometry = T)
 
-saveRDS(m.dew)
+m <- m %>% tidyr::spread("poll", "value")
+m$sand_storm <- (m$pm10 > 300) & (m$pm25/m$pm10 < 0.75) # THIS AFFECTS RESULTS A LOT
+m <- m %>% tidyr::gather("poll","value",pm25, pm10)
+
+require(pbmcapply)
+
+pbapply::pblapply(split(m, m$location_id),
+       function(m){
+         tryCatch({
+           location_id=unique(m$location_id)
+           print(location_id)
+
+           file.weather <- file.path("results","data","deweathered",sprintf("weather.%s.RDS",location_id))
+           file.dew <- file.path("results","data","deweathered",sprintf("meas.%s.RDS",location_id))
+
+           if(file.exists(file.dew) &&
+              file.info(file.dew)$size>100){
+             return(readRDS(file.dew))
+           }else{
+             m.dew.location <- creadeweather::deweather(
+               meas=m[!m$sand_storm & poll=="pm25",],
+               source="mee",
+               poll="pm25",
+               output=c("trend"),
+               training_start_anomaly = training_start,
+               training_end_anomaly = training_end,
+               save_weather_filename = file.weather,
+               upload_results = F
+             )
+
+             saveRDS(m.dew.location, file.dew)
+             m.dew.location
+           }
+         }, error=function(c){return(NA)})
+       }) %>% do.call(rbind, .) -> m.dew
 
 
 
-# Old ---------------------------------------------------------------------
+saveRDS(m.dew, "results/data/deweathered/m.dew.RDS")
+m.dew <- readRDS("results/data/deweathered/m.dew.RDS")
 
 
-# Deweather --------------------------------------------------
-# You need a folder with meteorological files
-# defined by DIR_HYSPLIT_MET
-# Otherwise it will download all files which might take quite some time
-# location_ids <- unique(meas.hp.count$location_id)
+# Deweathered version of meas
+meas <- m.dew %>%
+  filter(output=="trend",
+         poll=="pm25") %>%
+  tidyr::unnest(normalised) %>%
+  left_join(rcrea::cities(id=unique(m.dew$location_id), with_metadata=T) %>%
+              dplyr::select(location_id=id, location_name=name, gadm1_id, gadm1_name))
+
+meas <- meas[meas$date >= "2019-10-01",]
+meas <- meas %>% tidyr::spread("poll", "value")
+# meas$sand_storm <- (meas$pm10 > 300) & (meas$pm25/meas$pm10 < 0.75) # THIS AFFECTS RESULTS A LOT
+# meas$heavy_polluted <- (meas$pm25 >= 150) & (meas$pm25/meas$pm10 >= 0.75)
+meas$quarter <- as.character(lubridate::quarter(meas$date, with_year=T)) %>% gsub("\\.","Q",.)
 
 
+#1 % change in PM2.5 concentrations in 2020Q4 and 2021Q1, compared with 2019Q4 and 2019Q1, respectively, with sand storm days eliminated and both observed and deweathered data, by city, province and key region
 
-# Deweather capitals first
-capitals <- read_csv(file.path("data","cities.csv")) %>%
-  filter(capital %in% c("primary","admin")) %>%
-  select(location_name=city,
-         gadm1_name=admin_name) %>%
-  mutate(location_name=recode(location_name,
-                              "Ürümqi"="Urumqi",
-                              "Xi’an"="Xi'an")) %>%
-  left_join(meas %>%
-              distinct(location_name, location_id, gadm1_name) %>%
-              mutate(gadm1_name=recode(gadm1_name,
-                                       "Xinjiang Uygur"="Xinjiang",
-                                       "Nei Mongol"="Inner Mongolia",
-                                       "Ningxia Hui"="Ningxia",
-                                       "Xizang"="Tibet")))
-# We found everyone but Haikou-Hainan
-dir.create(file.path("results","data","deweathered"), showWarnings = F, recursive = T)
-location_ids <- setdiff(unique(capitals$location_id), NA)
+# Province
+m.change.province <- meas %>%
+  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1")) %>%
+  group_by(gadm1_id, province=gadm1_name, quarter) %>%
+  summarise_at(c("pm25"),mean, na.rm=T) %>%
+  tidyr::spread("quarter","pm25") %>%
+  mutate(
+    change_Q1_rel=`2021Q1`/`2020Q1`-1,
+    change_Q4_rel=`2020Q4`/`2019Q4`-1)
 
-for(location_id in location_ids){
-  print(location_id)
+write.csv(m.change.province, "results/data/change_province_deweathered.csv", row.names = F)
+map.change_province(m.change.province, folder="results/maps/deweathered/")
 
-  weather_filename <- file.path("results","data","deweathered",sprintf("weather.%s.RDS",location_id))
-  trajs_filename <- file.path("results","data","deweathered",sprintf("trajs.%s.RDS",location_id))
-  meas_filename <- file.path("results","data","deweathered",sprintf("meas.%s.RDS",location_id))
 
-  if(!file.exists(meas_filename)){
-    print("Deweathering")
-    m.dew <- creadeweather::deweather(
-      location_id=location_id,
-      poll="pm25",
-      source="mee",
-      upload_results = F,
-      add_fire=F,
-      output=c("trend", "anomaly"),
-      training_start_anomaly = lubridate::date(date_from)-lubridate::years(3), # Three years of training
-      training_end_anomaly = lubridate::date(date_from)-lubridate::days(1), # We end training just before 2020 winter
-      save_weather_filename = weather_filename
-    )
-    saveRDS(m.dew, meas_filename)
-  }
+# City
+m.change.city <- meas %>%
+  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1")) %>%
+  group_by(location_id, province=gadm1_name, city=location_name, quarter) %>%
+  summarise_at(c("pm25"), mean, na.rm=T) %>%
+  tidyr::spread("quarter","pm25") %>%
+  mutate(
+    change_Q1_rel=`2021Q1`/`2020Q1`-1,
+    change_Q4_rel=`2020Q4`/`2019Q4`-1)
 
-  # Calculate trajectories at pbl height
-  weather <- readRDS(weather_filename) %>%
-    select(location_id=station_id, geometry, meas_weather) %>%
-    tidyr::unnest(cols=meas_weather) %>%
-    filter(date>=date_from,
-           date<=date_to) %>%
-    filter(!is.na(pbl_min))
+write.csv(m.change.city, "results/data/change_city_deweathered.csv", row.names = F)
+map.change_city(m.change.city)
 
-  if(!file.exists(trajs_filename)){
-    print("Trajectories")
-    trajs <- creatrajs::trajs.get(
-      dates=weather$date,
-      location_id=weather$location_id,
-      geometry=weather$geometry,
-      duration_hour=duration_hour,
-      met_type=met_type,
-      height=(weather$pbl_min+weather$pbl_max)/2,
-      timezone="Asia/Shanghai",
-      cache_folder=file.path("cache","trajs"), # Trajectories files are cached here. Won't be recomputed if exist
-      parallel=F
-    )
+# Key regions
+m.change.keyregion <- meas %>%
+  rename(province=gadm1_name) %>%
+  left_join(data.keyregions()) %>%
+  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1")) %>%
+  group_by(keyregion, quarter) %>%
+  summarise_at(c("pm25"), mean, na.rm=T) %>%
+  tidyr::spread("quarter","pm25") %>%
+  mutate(
+    change_Q1_rel=`2021Q1`/`2020Q1`-1,
+    change_Q4_rel=`2020Q4`/`2019Q4`-1) %>%
+  dplyr::filter(!is.na(keyregion))
 
-    saveRDS(trajs, trajs_filename)
-  }
-}
+write.csv(m.change.keyregion, "results/data/change_keyregion_deweathered.csv", row.names = F)
+
+
+# Map change
+map_change <- map.change_interpolated(meas %>% mutate(sand_storm=F), res=0.1)
+png("results/maps/map_change_interpolated_deweathered.png", width = 1200, height=600)
+print(map_change)
+dev.off()
