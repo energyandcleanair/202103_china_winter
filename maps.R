@@ -150,7 +150,9 @@ map.change_interpolated <- function(meas, res=0.1){
                          ylab.right = "Change in percentage"
 
     )  +
-    latticeExtra::layer(sp::sp.lines(as(g,"Spatial"), col='gray')))
+    latticeExtra::layer(sp::sp.lines(as(g,"Spatial"), col='gray'),
+                        data=list(g=g))
+    )
 
   return(plt.contour)
 }

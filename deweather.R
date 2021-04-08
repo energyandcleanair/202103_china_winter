@@ -1,5 +1,14 @@
-require(creadeweather)
-require(pbapply)
+library(creadeweather)
+library(tidyverse)
+library(pbapply)
+library(gstat)
+library(magrittr)
+library(rasterVis)
+library(sp)
+
+source('maps.R')
+source('utils.R')
+source('data.R')
 
 date_from <- "2020-10-01"
 date_to <- "2021-03-31"
@@ -9,6 +18,7 @@ training_start <- training_end - lubridate::years(3)
 # Get observed measurements and remove sand storms before deweathering
 m <- rcrea::measurements(
   date_from=training_start,
+  date_to=date_to,
   source="mee",
   poll=c("pm25","pm10"),
   process_id="city_day_mad",
@@ -18,14 +28,11 @@ m <- m %>% tidyr::spread("poll", "value")
 m$sand_storm <- (m$pm10 > 300) & (m$pm25/m$pm10 < 0.75) # THIS AFFECTS RESULTS A LOT
 m <- m %>% tidyr::gather("poll","value",pm25, pm10)
 
-require(pbmcapply)
 
 pbapply::pblapply(split(m, m$location_id),
        function(m){
          tryCatch({
            location_id=unique(m$location_id)
-           print(location_id)
-
            file.weather <- file.path("results","data","deweathered",sprintf("weather.%s.RDS",location_id))
            file.dew <- file.path("results","data","deweathered",sprintf("meas.%s.RDS",location_id))
 
@@ -33,8 +40,9 @@ pbapply::pblapply(split(m, m$location_id),
               file.info(file.dew)$size>100){
              return(readRDS(file.dew))
            }else{
+             print(location_id)
              m.dew.location <- creadeweather::deweather(
-               meas=m[!m$sand_storm & poll=="pm25",],
+               meas=m[!m$sand_storm & m$poll=="pm25",],
                source="mee",
                poll="pm25",
                output=c("trend"),
@@ -57,9 +65,8 @@ m.dew <- readRDS("results/data/deweathered/m.dew.RDS")
 
 
 # Deweathered version of meas
-meas <- m.dew %>%
-  filter(output=="trend",
-         poll=="pm25") %>%
+meas <- tibble(m.dew) %>%
+  dplyr::filter(output=="trend", poll=="pm25") %>%
   tidyr::unnest(normalised) %>%
   left_join(rcrea::cities(id=unique(m.dew$location_id), with_metadata=T) %>%
               dplyr::select(location_id=id, location_name=name, gadm1_id, gadm1_name))
