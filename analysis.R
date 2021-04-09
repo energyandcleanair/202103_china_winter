@@ -3,17 +3,22 @@
 # remotes::install_github("energyandcleanair/rcrea", upgrade=F)
 # remotes::install_github("energyandcleanair/creatrajs", upgrade=F)
 
+library(magrittr)
 library(rcrea)
 library(remotes)
 library(creatrajs)
 library(tidyverse)
 library(tictoc)
-library(rmapshaper)
 library(sf)
+library(pbapply)
+library(sp)
+library(rasterVis)
+library(gstat)
 
 dir.create(file.path("results","data"), recursive=T, showWarnings=F)
 dir.create(file.path("results","plots"), recursive=T, showWarnings=F)
 dir.create(file.path("results","maps"), recursive=T, showWarnings=F)
+dir.create(file.path("results","maps","trajs"), recursive=T, showWarnings=F)
 dir.create(file.path("cache","trajs"), recursive=T, showWarnings=F)
 
 source('data.R')
@@ -27,9 +32,17 @@ date_to <- "2021-03-31"
 years_rel <- seq(0,-4)
 polls <- c("pm25","pm10")
 
+<<<<<<< HEAD
 # m.c = city-level measurements
 # m.s = station-level measurements
 m.c <- data.get_meas(use_cache=T, polls=polls, level="city", date_from=date_from, date_to=date_to, years_rel=years_rel) %>% data.enrich_and_widen()
+=======
+meas <- data.get_meas(use_cache=T, polls=polls, date_from=date_from, date_to=date_to, years_rel=years_rel)
+meas <- meas %>% tidyr::spread("poll", "value")
+meas$sand_storm <- (meas$pm10 > 300) & (meas$pm25/meas$pm10 < 0.75) # THIS AFFECTS RESULTS A LOT
+meas$heavy_polluted <- (meas$pm25 >= 150) & (meas$pm25/meas$pm10 >= 0.75)
+meas$quarter <- as.character(lubridate::quarter(meas$date, with_year=T)) %>% gsub("\\.","Q",.)
+>>>>>>> 2671f0315b20d1f0578139059715052cd10ff151
 
 m.s <- data.get_meas(use_cache=T, polls=polls, level="station", date_from=date_from, date_to=date_to, years_rel=years_rel) %>% data.enrich_and_widen()
 
@@ -87,8 +100,8 @@ write.csv(m.change.keyregion, "results/data/change_keyregion.csv", row.names = F
 
 
 # Map change
-map_change <- map.change_interpolated(m.c, res=0.1)
-png("results/maps/map_change_interpolated.png", width = 800, height=600)
+map_change <- map.change_interpolated(meas, res=0.1)
+png("results/maps/map_change_interpolated.png", width = 1200, height=600)
 print(map_change)
 dev.off()
 
@@ -100,21 +113,21 @@ m.hp.city <- m.c %>%
          date>="2020-04-01") %>%
   group_by(city=location_name, province=gadm1_name) %>%
   summarise(count=n())
-write.csv(m.hp.city, "results/data/heavy_polluted_per_city.csv")
+write.csv(m.hp.city, "results/data/heavy_polluted_per_city.csv", row.names = F)
 
 
 m.hp.worsecity <- m.hp.city %>%
   group_by(province) %>%
   filter(count==max(count)) %>%
   rename(worse_city=city)
-write.csv(m.hp.city, "results/data/heavy_polluted_per_province.csv")
+write.csv(m.hp.worsecity, "results/data/heavy_polluted_per_province.csv", row.names = F)
 
 
 # back trajectories for the heavy polluted days, for the worst city in each province and for provincial capitals
 
 capitals <- read_csv(file.path("data","cities.csv")) %>%
   filter(capital %in% c("primary","admin")) %>%
-  select(location_name=city,
+  dplyr::select(location_name=city,
          gadm1_name=admin_name) %>%
   mutate(location_name=recode(location_name,
                               "Ürümqi"="Urumqi",
@@ -129,6 +142,7 @@ capitals <- read_csv(file.path("data","cities.csv")) %>%
 
 worse_cities <- m.c %>%
   filter(heavy_polluted,
+         !sand_storm,
          date>="2020-04-01") %>%
   group_by(location_id, location_name, gadm1_name) %>%
   summarise(count=n()) %>%
@@ -139,13 +153,14 @@ location_ids <- unique(c(capitals$location_id, worse_cities$location_id))
 
 duration_hour=72
 met_type="gdas1"
-
+height=500
 
 meas.hp.trajs <- m.c %>%
   left_join(rcrea::cities(id=unique(m.c$location_id), with_geometry=T) %>% dplyr::select(location_id=id, geometry)) %>%
   filter(location_id %in% location_ids) %>%
   filter(heavy_polluted,
-         !sand_storm) %>%
+         !sand_storm,
+         season=="2020-2021") %>%
   distinct(location_id, location_name, gadm1_name, geometry, date) %>%
   rowwise() %>%
   mutate(
@@ -155,6 +170,7 @@ meas.hp.trajs <- m.c %>%
                                tolower(gadm1_name),
                                tolower(location_name),
                                gsub("-","",as.character(date)))))
+   )
 
 
 
@@ -169,4 +185,34 @@ meas.hp.trajs$trajs <- creatrajs::trajs.get(
   cache_folder=file.path("cache","trajs"), # Trajectories files are cached here. Won't be recomputed if exist
   parallel=F
 )
+
+
+
+# Add basemap
+meas.hp.trajs.all <-
+  bind_rows(
+    creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 800, zoom_level = 7) %>% mutate(buffer_km=800)
+    # creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 500, zoom_level = 7) %>% mutate(buffer_km=500)
+    )
+
+meas.hp.trajs.all$filename=file.path("results","maps","trajs",
+                   sprintf("%s_%s_%s_%dkm.png",
+                           tolower(meas.hp.trajs.all$gadm1_name),
+                           tolower(meas.hp.trajs.all$location_name),
+                           gsub("-","",as.character(meas.hp.trajs.all$date)),
+                           meas.hp.trajs.all$buffer_km))
+
+pbapply::pbmapply(
+  creatrajs::map.trajs,
+  trajs = meas.hp.trajs.all$trajs,
+  basemap = meas.hp.trajs.all$basemap,
+  location_id = meas.hp.trajs.all$location_id,
+  location_name = meas.hp.trajs.all$location_name,
+  date=meas.hp.trajs.all$date,
+  meas=list(NULL),
+  duration_hour=duration_hour,
+  met_type=met_type,
+  height=height,
+  filename=meas.hp.trajs.all$filename,
+  SIMPLIFY=F)
 
