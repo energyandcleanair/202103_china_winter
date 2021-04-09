@@ -112,13 +112,13 @@ m.change.keyregion <- meas %>%
   rename(province=gadm1_name) %>%
   left_join(data.keyregions()) %>%
   filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1")) %>%
-  group_by(keyregion, quarter) %>%
+  group_by(keyregion2018, quarter) %>%
   summarise_at(c("pm25"), mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
     change_Q1_rel=`2021Q1`/`2020Q1`-1,
     change_Q4_rel=`2020Q4`/`2019Q4`-1) %>%
-  dplyr::filter(!is.na(keyregion))
+  dplyr::filter(!is.na(keyregion2018))
 
 write.csv(m.change.keyregion, "results/data/change_keyregion_deweathered.csv", row.names = F)
 
@@ -128,3 +128,5 @@ map_change <- map.change_interpolated(meas %>% mutate(sand_storm=F), res=0.1)
 png("results/maps/map_change_interpolated_deweathered.png", width = 1200, height=600)
 print(map_change)
 dev.off()
+
+

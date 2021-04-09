@@ -32,25 +32,16 @@ date_to <- "2021-03-31"
 years_rel <- seq(0,-4)
 polls <- c("pm25","pm10")
 
-<<<<<<< HEAD
 # m.c = city-level measurements
 # m.s = station-level measurements
 m.c <- data.get_meas(use_cache=T, polls=polls, level="city", date_from=date_from, date_to=date_to, years_rel=years_rel) %>% data.enrich_and_widen()
-=======
-meas <- data.get_meas(use_cache=T, polls=polls, date_from=date_from, date_to=date_to, years_rel=years_rel)
-meas <- meas %>% tidyr::spread("poll", "value")
-meas$sand_storm <- (meas$pm10 > 300) & (meas$pm25/meas$pm10 < 0.75) # THIS AFFECTS RESULTS A LOT
-meas$heavy_polluted <- (meas$pm25 >= 150) & (meas$pm25/meas$pm10 >= 0.75)
-meas$quarter <- as.character(lubridate::quarter(meas$date, with_year=T)) %>% gsub("\\.","Q",.)
->>>>>>> 2671f0315b20d1f0578139059715052cd10ff151
-
 m.s <- data.get_meas(use_cache=T, polls=polls, level="station", date_from=date_from, date_to=date_to, years_rel=years_rel) %>% data.enrich_and_widen()
 
 #1 % change in PM2.5 concentrations in 2020Q4 and 2021Q1, compared with 2019Q4 and 2019Q1, respectively, with sand storm days eliminated and both observed and deweathered data, by city, province and key region
 
 # Province
 m.change.province <- m.c %>%
-  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1"),
+  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
          !sand_storm) %>%
   group_by(gadm1_id, province=gadm1_name, quarter) %>%
   summarise_at(c("pm25"),mean, na.rm=T) %>%
@@ -65,7 +56,7 @@ map.change_province(m.change.province)
 
 # City
 m.change.city <- m.c %>%
-  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1"),
+  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
          !sand_storm) %>%
   group_by(location_id, province=gadm1_name, city=location_name, quarter) %>%
   summarise_at(c("pm25"), mean, na.rm=T) %>%
@@ -81,23 +72,72 @@ map.change_city(m.change.city)
 m.change.keyregion <- m.c %>%
   rename(province=gadm1_name) %>%
   left_join(data.keyregions()) %>%
-  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1"),
+  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
          !sand_storm) %>%
-  group_by(keyregion, quarter) %>%
+  group_by(keyregion2018, quarter) %>%
   summarise_at(c("pm25"), mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
     change_Q1_rel=`2021Q1`/`2020Q1`-1,
     change_Q4_rel=`2020Q4`/`2019Q4`-1) %>%
-  dplyr::filter(!is.na(keyregion))
+  dplyr::filter(!is.na(keyregion2018))
 
 write.csv(m.change.keyregion, "results/data/change_keyregion.csv", row.names = F)
 
+
+
 #TODO average by station & monthly + compare with monthly official numbers
+# 2x2 different ways
+# City or station level
+# With or without sand storm
 
+# City w/o sandstorm
+avg1 <- m.c %>%
+  rename(province=gadm1_name) %>%
+  left_join(data.keyregions(), by=c("location_name","province")) %>%
+  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
+         !sand_storm) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise_at(c("pm25"), mean, na.rm=T) %>%
+  tidyr::spread("quarter","pm25") %>%
+  dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
+  mutate(method="City without sandstorm")
 
+# City w sandstorm
+avg2 <- m.c %>%
+  rename(province=gadm1_name) %>%
+  left_join(data.keyregions(), by=c("location_name","province")) %>%
+  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1")) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise_at(c("pm25"), mean, na.rm=T) %>%
+  tidyr::spread("quarter","pm25") %>%
+  dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
+  mutate(method="City with sandstorm")
 
+# Station w/o sandstorm
+avg3 <- m.s %>%
+  left_join(data.keyregions("station"), by=c("location_id")) %>%
+  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
+         !sand_storm) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise_at(c("pm25"), mean, na.rm=T) %>%
+  tidyr::spread("quarter","pm25") %>%
+  dplyr::filter(!is.na(keyregion2018)) %>%
+  mutate(method="Station without sandstorm")
 
+# Station with sandstorm
+avg4 <- m.s %>%
+  left_join(data.keyregions("station"), by=c("location_id")) %>%
+  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1")) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise_at(c("pm25"), mean, na.rm=T) %>%
+  tidyr::spread("quarter","pm25") %>%
+  dplyr::filter(!is.na(keyregion2018)) %>%
+  mutate(method="Station with sandstorm")
+
+rbind(avg1, avg2, avg3, avg4) %>%
+  arrange(keyregion2018, method) %>%
+  write.csv("results/data/keyregion_methodologies.csv", row.names = F)
 
 # Map change
 map_change <- map.change_interpolated(meas, res=0.1)
@@ -182,7 +222,7 @@ meas.hp.trajs <- m.c %>%
                        sprintf("%s_%s_%s.png",
                                tolower(gadm1_name),
                                tolower(location_name),
-                               gsub("-","",as.character(date)))))
+                               gsub("-","",as.character(date))))
    )
 
 

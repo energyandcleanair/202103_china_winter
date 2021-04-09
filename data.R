@@ -5,9 +5,11 @@ data.get_meas <- function(use_cache=T, polls, date_from, date_to, years_rel, lev
 
   if(level=="city"){
     location_id <- NULL
+    process_id <- "city_day_mad"
   }else{
     location_id <- read.csv("data/station_key2018.csv") %>%
-      filter(keyregion!="none" & !is.na(keyregion)) %>% pull(station_code) %>% tolower()
+      filter(keyregion2018!="none" & !is.na(keyregion2018)) %>% pull(station_code) %>% tolower()
+    process_id <- "station_day_mad"
   }
 
   if(file.exists(f) && use_cache){
@@ -21,7 +23,7 @@ data.get_meas <- function(use_cache=T, polls, date_from, date_to, years_rel, lev
                         date_from=lubridate::date(date_from)+lubridate::years(year_rel),
                         date_to=lubridate::date(date_to)+lubridate::years(year_rel),
                         source="mee",
-                        process_id="city_day_mad",
+                        process_id=process_id,
                         deweathered=F,
                         poll=polls,
                         with_metadata=T,
@@ -64,12 +66,12 @@ data.keyregions <- function(level="city"){
 
   if(level=="city"){
     read.csv("data/station_key2018.csv") %>%
-      distinct(location_name=CityEN, keyregion, province=Province)
+      distinct(location_name=CityEN, keyregion2018, province=Province)
   }else{
     read.csv("data/station_key2018.csv") %>%
       distinct(location_id=tolower(station_code),
                location_name=station_name,
-               city_name=CityEN, keyregion, province=Province)
+               city_name=CityEN, keyregion2018, province=Province)
   }
 
 }
