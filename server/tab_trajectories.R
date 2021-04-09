@@ -399,7 +399,7 @@ observe({
 clickedDate <- reactiveVal()
 
 observe({
-  req(trajs_plot_poll)
+  req(trajs_plot_poll())
   d <- unlist(event_data(event = "plotly_click",
                          source = "trajs",
                          priority = "event"))
