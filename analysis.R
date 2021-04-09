@@ -111,6 +111,19 @@ m.hp.worsecity <- m.hp.city %>%
 write.csv(m.hp.worsecity, "results/data/heavy_polluted_per_province.csv", row.names = F)
 
 
+# Can you generate the heavy polluted days by cities in 2020Q4 and 2021Q1
+m.count.city <- meas %>%
+  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1"),
+         !sand_storm,
+         heavy_polluted) %>%
+  group_by(location_id, province=gadm1_name, city=location_name, quarter) %>%
+  summarise(ndays=n()) %>%
+  tidyr::spread("quarter","ndays") %>%
+  replace(is.na(.), 0)
+write.csv(m.count.city, "results/data/heavy_polluted_per_city_quarter.csv", row.names = F)
+
+
+
 # back trajectories for the heavy polluted days, for the worst city in each province and for provincial capitals
 
 capitals <- read_csv(file.path("data","cities.csv")) %>%
