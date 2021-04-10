@@ -41,9 +41,11 @@ data.get_meas <- function(use_cache=T, polls, date_from, date_to, years_rel, lev
   }
 }
 
-data.enrich_and_widen <- function(m){
+data.enrich_and_widen <- function(m,
+                                  storm_pm10_threshold=300,
+                                  storm_pm_ratio=0.75){
   m <- m %>% tidyr::spread("poll", "value")
-  m$sand_storm <- (m$pm10 > 300) & (m$pm25/m$pm10 < 0.75) # THIS AFFECTS A LOT RESULTS
+  m$sand_storm <- (m$pm10 > storm_pm10_threshold) & (m$pm25/m$pm10 < storm_pm_ratio) # THIS AFFECTS A LOT RESULTS
   m$heavy_polluted <- (m$pm25 >= 150) & (m$pm25/m$pm10 >= 0.75)
   m$quarter <- as.character(lubridate::quarter(m$date, with_year=T)) %>% gsub("\\.","Q",.)
   m
