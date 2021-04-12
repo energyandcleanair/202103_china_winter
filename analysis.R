@@ -228,7 +228,7 @@ bind_rows(hp.official, hp2, hp1, hp4, hp3) %>%
   write.csv("results/data/keyregion_methodologies_hp.csv", row.names = F, na = "-")
 
 # Map change
-map_change <- map.change_interpolated(meas, res=0.1)
+map_change <- map.change_interpolated(m.c, res=0.1)
 png("results/maps/map_change_interpolated.png", width = 1200, height=600)
 print(map_change)
 dev.off()
@@ -252,7 +252,7 @@ write.csv(m.hp.worsecity, "results/data/heavy_polluted_per_province.csv", row.na
 
 
 # Can you generate the heavy polluted days by cities in 2020Q4 and 2021Q1
-m.count.city <- meas %>%
+m.count.city <- m.c %>%
   filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1"),
          !sand_storm,
          heavy_polluted) %>%
