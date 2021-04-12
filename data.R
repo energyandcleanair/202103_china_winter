@@ -1,5 +1,5 @@
 
-data.get_meas <- function(use_cache=T, polls, date_from, date_to, years_rel, level="city"){
+data.get_meas <- function(use_cache=T, polls, date_from, date_to, level="city"){
 
   f <- file.path("results","data",sprintf("meas.%s.RDS",level))
 
@@ -15,13 +15,10 @@ data.get_meas <- function(use_cache=T, polls, date_from, date_to, years_rel, lev
   if(file.exists(f) && use_cache){
     readRDS(f)
   }else{
-    meas <- do.call("bind_rows",
-                    lapply(years_rel, function(year_rel){
-                      print(year_rel)
-                      rcrea::measurements(
+    meas <- rcrea::measurements(
                         location_id=location_id,
-                        date_from=lubridate::date(date_from)+lubridate::years(year_rel),
-                        date_to=lubridate::date(date_to)+lubridate::years(year_rel),
+                        date_from=date_from,
+                        date_to=date_to,
                         source="mee",
                         process_id=process_id,
                         deweathered=F,
@@ -29,21 +26,16 @@ data.get_meas <- function(use_cache=T, polls, date_from, date_to, years_rel, lev
                         with_metadata=T,
                         with_geometry=F,
                         aggregate_level=level
-                      ) %>%
-                        mutate(season=paste(
-                          lubridate::year(date_from)+year_rel,
-                          lubridate::year(date_from)+year_rel+1,
-                          sep="-")) %>%
-                        ungroup()
-                    }))
+                      ) %>% ungroup()
+
     saveRDS(meas, f)
     return(meas)
   }
 }
 
 data.enrich_and_widen <- function(m,
-                                  storm_pm10_threshold=300,
-                                  storm_pm_ratio=0.75){
+                                  storm_pm10_threshold,
+                                  storm_pm_ratio){
   m <- m %>% tidyr::spread("poll", "value")
   m$sand_storm <- (m$pm10 > storm_pm10_threshold) & (m$pm25/m$pm10 < storm_pm_ratio) # THIS AFFECTS A LOT RESULTS
   m$heavy_polluted <- (m$pm25 >= 150) & (m$pm25/m$pm10 >= 0.75)

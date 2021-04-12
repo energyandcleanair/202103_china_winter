@@ -10,7 +10,7 @@
 "Benxi","Liaoning",1
 "Binzhou","Shandong",8
 "Bozhou","Anhui",1
-"Changchun","Jilin",1
+"Changchun","Jilin",9
 "Changde","Hunan",1
 "Changji","Xinjiang Uygur",1
 "Changsha","Hunan",3
@@ -30,8 +30,9 @@
 "Haimen","Jiangsu",1
 "Handan","Hebei",3
 "Hanzhong","Shaanxi",6
-"Harbin","Heilongjiang",3
+"Harbin","Heilongjiang",8
 "Hebi","Henan",9
+"Hegang","Heilongjiang",1
 "Hengshui","Hebei",5
 "Hengyang","Hunan",4
 "Heze","Shandong",1
@@ -39,16 +40,17 @@
 "Huainan","Anhui",3
 "Huludao","Liaoning",7
 "Ili Kazak","Xinjiang Uygur",12
-"Jiamusi","Heilongjiang",1
+"Jiamusi","Heilongjiang",3
 "Jiangyin","Jiangsu",1
 "Jiaonan","Shandong",1
 "Jiaozhou","Shandong",5
+"Jilin","Jilin",5
 "Jimo","Shandong",4
 "Jinan","Shandong",1
 "Jingmen","Hubei",6
 "Jining","Shandong",9
 "Jinzhou","Liaoning",6
-"Jiuquan","Gansu",1
+"Jixi","Heilongjiang",1
 "Kaifeng","Henan",15
 "Kunshan","Jiangsu",1
 "Laibin","Guangxi",3
@@ -58,7 +60,7 @@
 "Liangshan","Sichuan",2
 "Lianyungang","Jiangsu",2
 "Liaoyang","Liaoning",7
-"Liaoyuan","Jilin",1
+"Liaoyuan","Jilin",3
 "Linfen","Shanxi",4
 "Linyi","Shandong",7
 "Luohe","Henan",11
@@ -73,6 +75,8 @@
 "Pingdu","Shandong",6
 "Pingxiang","Jiangxi",1
 "Puyang","Henan",15
+"Qiqihar","Heilongjiang",3
+"Qitaihe","Heilongjiang",2
 "Rizhao","Shandong",3
 "Sanmenxia","Henan",4
 "Shanghai","Shanghai",1
@@ -83,7 +87,10 @@
 "Shijiazhuang","Hebei",5
 "Shiyan","Hubei",1
 "Shouguang","Shandong",2
+"Shuangyashan","Heilongjiang",1
 "Siping","Jilin",1
+"Songyuan","Jilin",1
+"Suihua","Heilongjiang",5
 "Suizhou","Hubei",1
 "Suqian","Jiangsu",5
 "Suzhou","Anhui",3
@@ -95,12 +102,13 @@
 "Tianjin","Tianjin",1
 "Tieling","Liaoning",4
 "Tongchuan","Shaanxi",1
+"Tongliao","Nei Mongol",2
 "Urumqi","Xinjiang Uygur",32
 "Weifang","Shandong",5
 "Weinan","Shaanxi",6
 "Wuhan","Hubei",3
 "Wujiang","Jiangsu",1
-"Wujiaqu","Xinjiang Uygur",35
+"Wujiaqu","Xinjiang Uygur",31
 "Wulanchabu","Nei Mongol",2
 "Xi'an","Shaanxi",5
 "Xiangtan","Hunan",2
@@ -110,6 +118,7 @@
 "Xingtai","Hebei",5
 "Xinyang","Henan",4
 "Xinzhou","Shanxi",2
+"Xishuangbanna","Yunnan",4
 "Xuchang","Henan",15
 "Xuzhou","Jiangsu",1
 "Yancheng","Jiangsu",1

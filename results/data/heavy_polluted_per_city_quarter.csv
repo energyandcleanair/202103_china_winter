@@ -6,7 +6,7 @@
 "baoding_chn.10_1_cn","Hebei","Baoding",0,14,0,3
 "baoji_chn.22_1_cn","Shaanxi","Baoji",4,6,1,3
 "baotou_chn.19_1_cn","Nei Mongol","Baotou",2,21,0,0
-"bayan nur_chn.19_1_cn","Nei Mongol","Bayan Nur",0,6,0,1
+"bayan nur_chn.19_1_cn","Nei Mongol","Bayan Nur",0,5,0,1
 "beijing_chn.2_1_cn","Beijing","Beijing",1,6,0,5
 "bengbu_chn.1_1_cn","Anhui","Bengbu",0,1,2,0
 "benxi_chn.18_1_cn","Liaoning","Benxi",0,0,0,1
@@ -38,7 +38,7 @@
 "fuyang_chn.1_1_cn","Anhui","Fuyang",0,5,0,1
 "guang'an_chn.26_1_cn","Sichuan","Guang'an",0,0,1,0
 "haimen_chn.15_1_cn","Jiangsu","Haimen",0,1,1,0
-"handan_chn.10_1_cn","Hebei","Handan",1,6,0,3
+"handan_chn.10_1_cn","Hebei","Handan",1,5,0,3
 "hanzhong_chn.22_1_cn","Shaanxi","Hanzhong",0,2,2,4
 "harbin_chn.11_1_cn","Heilongjiang","Harbin",6,17,0,3
 "hebi_chn.12_1_cn","Henan","Hebi",10,10,3,6
@@ -69,7 +69,6 @@
 "jintan_chn.15_1_cn","Jiangsu","Jintan",0,2,0,0
 "jinzhong_chn.25_1_cn","Shanxi","Jinzhong",0,1,0,0
 "jinzhou_chn.18_1_cn","Liaoning","Jinzhou",2,3,0,6
-"jiuquan_chn.5_1_cn","Gansu","Jiuquan",0,0,0,1
 "jurong_chn.15_1_cn","Jiangsu","Jurong",0,1,0,0
 "kaifeng_chn.12_1_cn","Henan","Kaifeng",5,12,7,8
 "kashi_chn.28_1_cn","Xinjiang Uygur","Kashi",1,5,0,0
@@ -107,7 +106,7 @@
 "shangqiu_chn.12_1_cn","Henan","Shangqiu",3,10,5,7
 "shaoyang_chn.14_1_cn","Hunan","Shaoyang",2,0,3,0
 "shenyang_chn.18_1_cn","Liaoning","Shenyang",0,6,0,5
-"shihezi_chn.28_1_cn","Xinjiang Uygur","Shihezi",10,32,15,25
+"shihezi_chn.28_1_cn","Xinjiang Uygur","Shihezi",9,32,15,25
 "shijiazhuang_chn.10_1_cn","Hebei","Shijiazhuang",0,11,0,5
 "shiyan_chn.13_1_cn","Hubei","Shiyan",0,0,0,1
 "shizuishan_chn.20_1_cn","Ningxia Hui","Shizuishan",0,6,0,0
@@ -135,7 +134,7 @@
 "wuhan_chn.13_1_cn","Hubei","Wuhan",0,0,2,1
 "wuhu_chn.1_1_cn","Anhui","Wuhu",0,1,0,0
 "wujiang_chn.15_1_cn","Jiangsu","Wujiang",0,1,1,0
-"wujiaqu_chn.28_1_cn","Xinjiang Uygur","Wujiaqu",3,15,12,23
+"wujiaqu_chn.28_1_cn","Xinjiang Uygur","Wujiaqu",3,15,12,19
 "wulanchabu_chn.19_1_cn","Nei Mongol","Wulanchabu",0,0,0,2
 "wuxi_chn.15_1_cn","Jiangsu","Wuxi",0,1,0,0
 "wuzhong_chn.20_1_cn","Ningxia Hui","Wuzhong",0,2,0,0
