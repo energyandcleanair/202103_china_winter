@@ -45,17 +45,20 @@ m.s <- data.get_meas(use_cache=T, polls=polls, level="station", date_from=date_f
                        storm_pm_ratio=storm_pm_ratio)
 
 #1 % change in PM2.5 concentrations in 2020Q4 and 2021Q1, compared with 2019Q4 and 2019Q1, respectively, with sand storm days eliminated and both observed and deweathered data, by city, province and key region
+quarters <- c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1")
 
 # Province
 m.change.province <- m.c %>%
-  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
+  filter(quarter %in% quarters,
          !sand_storm) %>%
   group_by(gadm1_id, province=gadm1_name, quarter) %>%
   summarise_at(c("pm25"),mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
-    change_Q1_rel=round(`2021Q1`/`2020Q1`-1,3),
-    change_Q4_rel=round(`2020Q4`/`2019Q4`-1,3))
+    `2021Q1_vs_2019Q1_str`=paste0(round(`2021Q1`/`2019Q1`-1,3)*100,"%"), # For csv
+    `2020Q4_vs_2019Q4_str`=paste0(round(`2020Q4`/`2019Q4`-1,3)*100,"%"), # For csv
+    `2021Q1_vs_2019Q1`=`2021Q1`/`2019Q1`-1, # For map
+    `2020Q4_vs_2019Q4`=`2020Q4`/`2019Q4`-1)
 
 write.csv(m.change.province, "results/data/change_province.csv", row.names = F)
 map.change_province(m.change.province)
@@ -63,14 +66,17 @@ map.change_province(m.change.province)
 
 # City
 m.change.city <- m.c %>%
-  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
+  filter(quarter %in% quarters,
          !sand_storm) %>%
   group_by(location_id, province=gadm1_name, city=location_name, quarter) %>%
   summarise_at(c("pm25"), mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
-    change_Q1_rel=round(`2021Q1`/`2020Q1`-1,3),
-    change_Q4_rel=round(`2020Q4`/`2019Q4`-1,3))
+    `2021Q1_vs_2019Q1_str`=paste0(round(`2021Q1`/`2019Q1`-1,3)*100,"%"), # For csv
+    `2020Q4_vs_2019Q4_str`=paste0(round(`2020Q4`/`2019Q4`-1,3)*100,"%"), # For csv
+    `2021Q1_vs_2019Q1`=`2021Q1`/`2019Q1`-1, # For map
+    `2020Q4_vs_2019Q4`=`2020Q4`/`2019Q4`-1 # For map
+  )
 
 write.csv(m.change.city, "results/data/change_city.csv", row.names = F)
 map.change_city(m.change.city)
@@ -79,14 +85,17 @@ map.change_city(m.change.city)
 m.change.keyregion <- m.c %>%
   rename(province=gadm1_name) %>%
   left_join(data.keyregions()) %>%
-  filter(quarter %in% c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1"),
+  filter(quarter %in% quarters,
          !sand_storm) %>%
   group_by(keyregion2018, quarter) %>%
   summarise_at(c("pm25"), mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
-    change_Q1_rel=round(`2021Q1`/`2020Q1`-1,3),
-    change_Q4_rel=round(`2020Q4`/`2019Q4`-1,3)) %>%
+    `2021Q1_vs_2019Q1_str`=paste0(round(`2021Q1`/`2019Q1`-1,3)*100,"%"), # For csv
+    `2020Q4_vs_2019Q4_str`=paste0(round(`2020Q4`/`2019Q4`-1,3)*100,"%"), # For csv
+    `2021Q1_vs_2019Q1`=`2021Q1`/`2019Q1`-1, # For map
+    `2020Q4_vs_2019Q4`=`2020Q4`/`2019Q4`-1 # For map
+  ) %>%
   dplyr::filter(!is.na(keyregion2018))
 
 write.csv(m.change.keyregion, "results/data/change_keyregion.csv", row.names = F)
@@ -97,7 +106,6 @@ write.csv(m.change.keyregion, "results/data/change_keyregion.csv", row.names = F
 # 2x2 different ways
 # City or station level
 # With or without sand storm
-quarters <- c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1")
 # City w/o sandstorm
 avg1 <- m.c %>%
   rename(province=gadm1_name) %>%
@@ -253,7 +261,7 @@ write.csv(m.hp.worsecity, "results/data/heavy_polluted_per_province.csv", row.na
 
 # Can you generate the heavy polluted days by cities in 2020Q4 and 2021Q1
 m.count.city <- m.c %>%
-  filter(quarter %in% c("2020Q4","2021Q1","2019Q4","2020Q1"),
+  filter(quarter %in% quarters,
          !sand_storm,
          heavy_polluted) %>%
   group_by(location_id, province=gadm1_name, city=location_name, quarter) %>%
