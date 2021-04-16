@@ -1,3 +1,7 @@
+*_200km.png
+results/data/deweathered/meas.*
+results/data/deweathered/weather.*
+
 # History files
 .Rhistory
 .Rapp.history

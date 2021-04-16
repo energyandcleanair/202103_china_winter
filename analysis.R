@@ -271,6 +271,27 @@ m.count.city <- m.c %>%
 write.csv(m.count.city, "results/data/heavy_polluted_per_city_quarter.csv", row.names = F)
 
 
+# Sand storms -------------------------------------------------------------
+
+m.storm.keyregion <- m.c %>%
+  rename(province=gadm1_name) %>%
+  left_join(data.keyregions()) %>%
+  filter(quarter %in% quarters,
+         sand_storm) %>%
+  mutate(season=recode(quarter,
+                       "2018Q4"="2018-2019",
+                       "2019Q1"="2018-2019",
+                       "2019Q4"="2019-2020",
+                       "2020Q1"="2019-2020",
+                       "2020Q4"="2020-2021",
+                       "2021Q1"="2020-2021",)) %>%
+  distinct(keyregion2018, season, date) %>%
+  group_by(keyregion2018, season) %>%
+  summarise(count=n()) %>%
+  dplyr::filter(!is.na(keyregion2018))
+
+
+write.csv(m.storm.keyregion, "results/data/sandstorm_keyregion.csv", row.names = F)
 
 # back trajectories for the heavy polluted days, for the worst city in each province and for provincial capitals
 #

@@ -6,22 +6,26 @@ map.change_province <- function(m.change.province,
 
   g <- data.gadm()
   m.change.province.sf <- g %>%
-    mutate(gadm1_id=tolower(GID_1)) %>%
+    # mutate(gadm1_id=tolower(GID_1)) %>%
     left_join(m.change.province,
-              by="gadm1_id")
+              by=c("NAME_1"="province"))
 
   l <- max(abs(m.change.province.sf$`2021Q1_vs_2019Q1`),abs(m.change.province.sf$`2020Q4_vs_2019Q4`))
 
   p1 <- ggplot(m.change.province.sf) +
     geom_sf(aes(fill=`2021Q1_vs_2019Q1`)) +
-    geom_sf_text(aes(label=paste0(round(`2021Q1_vs_2019Q1`*100),"%")),
+    geom_sf_text(aes(label=ifelse(is.na(`2021Q1_vs_2019Q1`),
+                              "",
+                              paste0(round(`2021Q1_vs_2019Q1`*100),"%"))),
                  size=3) +
     scale_fill_distiller(palette="RdBu",
                          limits=c(-l,l),
                          name=NULL,
                          labels=scales::percent) +
     rcrea::theme_crea() +
-    labs(title="PM 2.5 concentration: 2021Q1 vs 2019Q1")
+    labs(title="PM 2.5 concentration: 2021Q1 vs 2019Q1",
+         y=NULL,
+         x=NULL)
 
   ggsave(file.path(folder,"change_province_q1.png"), p1,
          width=width,
@@ -30,14 +34,18 @@ map.change_province <- function(m.change.province,
 
   p4 <- ggplot(m.change.province.sf) +
     geom_sf(aes(fill=`2020Q4_vs_2019Q4`)) +
-    geom_sf_text(aes(label=paste0(round(`2020Q4_vs_2019Q4`*100),"%")),
+    geom_sf_text(aes(label=ifelse(is.na(`2020Q4_vs_2019Q4`),
+                                  "",
+                                  paste0(round(`2020Q4_vs_2019Q4`*100),"%"))),
                  size=3) +
     scale_fill_distiller(palette="RdBu",
                          limits=c(-l,l),
                          name=NULL,
                          labels=scales::percent) +
     rcrea::theme_crea() +
-    labs(title="PM 2.5 concentration: 2020Q4 vs 2019Q4")
+    labs(title="PM 2.5 concentration: 2020Q4 vs 2019Q4",
+         y=NULL,
+         x=NULL)
 
   ggsave(file.path(folder,"change_province_q4.png"), p4,
          width=width,

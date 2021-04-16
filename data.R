@@ -53,7 +53,13 @@ data.gadm <- function(level=1){
   # rmapshaper::ms_simplify(input = as(g, 'Spatial')) %>%
   # st_as_sf() %>% sf::write_sf("data/boundaries/gadm_simplified.shp")
 
-  return(sf::read_sf("data/boundaries/gadm_simplified.shp"))
+  # require(GADMTools)
+  # g.chn <- GADMTools::gadm_sf.loadCountries("CHN", level=1, simplify=0.01)
+  # g.twn <- GADMTools::gadm_sf.loadCountries("TWN", level=0, simplify=0.01)
+  # g <- bind_rows(g.chn$sf, g.twn$sf)
+  # sf::write_sf(g, "data/boundaries/gadm_simplified2.shp")
+
+  return(sf::read_sf("data/boundaries/gadm_simplified2.shp"))
 }
 
 data.keyregions <- function(level="city"){

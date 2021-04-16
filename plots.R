@@ -36,3 +36,24 @@ plots.change_province <- function(m.change.province,
          height=height)
 
 }
+
+
+plots.sandstorm_keyregion <- function(m.storm.keyregion){
+  ggplot(m.storm.keyregion) +
+    geom_bar(aes(season, count, fill="1"),
+             stat="identity",
+             show.legend = F) +
+    facet_wrap(~keyregion2018) +
+    scale_y_continuous(limits=c(0,10),
+                       breaks=seq(0,10,2),
+                       expand = expansion(mult=c(0,0.1),0)) +
+
+    rcrea::theme_crea() +
+    rcrea::CREAtheme.scale_fill_crea_d() +
+    labs(title="Occurence of sand storms in key regions",
+         subtitle="Number of sand storm days in winter",
+         caption="Source: CREA",
+         x=NULL, y=NULL)
+
+  ggsave("results/plots/storm_keyregion.png", width=8, height=4)
+}
