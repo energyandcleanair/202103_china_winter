@@ -43,6 +43,15 @@ data.enrich_and_widen <- function(m,
   m
 }
 
+data.weather <- function(){
+  fs <- list.files("results/data/deweathered/","weather*", full.names=T)
+  lapply(fs, readRDS) %>%
+    do.call(bind_rows, .) %>%
+    rename(location_id=station_id) %>%
+    dplyr::select(-c(timezone)) %>%
+    tidyr::unnest(meas_weather)
+}
+
 data.gadm <- function(level=1){
 
   # We first simplified gadm
@@ -60,6 +69,59 @@ data.gadm <- function(level=1){
   # sf::write_sf(g, "data/boundaries/gadm_simplified2.shp")
 
   return(sf::read_sf("data/boundaries/gadm_simplified2.shp"))
+}
+
+data.gadm.wneighbours <- function(level=1){
+
+  # We first simplified gadm
+  library(rmapshaper)
+
+  # Level 1 for China, 0 for other countries
+  # g.chn <- sf::read_sf(
+  #   file.path(Sys.getenv("DIR_DATA"),
+  #             sprintf("boundaries/gadm/gadm36_%d.shp",1))) %>%
+  #   filter(GID_0=="CHN")
+  #
+  # margin <- 10
+  # bbox <- sf::st_bbox(g.chn) + c(-1,-1,1,1)*margin
+  #
+  #
+  # g.other <- sf::read_sf(
+  #   file.path(Sys.getenv("DIR_DATA"),
+  #             sprintf("boundaries/gadm/gadm36_%d.shp",0))) %>%
+  #   filter(GID_0!="CHN")
+  #
+  # g.other <- g.other %>% sf::st_crop(bbox)
+  #
+  # g = rbind(g.chn, g.other)
+  # rmapshaper::ms_simplify(input = as(g, 'Spatial')) %>%
+  # st_as_sf() %>% sf::write_sf("data/boundaries/gadm_wneighbours_simplified.shp")
+
+  # require(GADMTools)
+
+  # g.neighbours <- GADMTools::gadm_sf.loadCountries(c("CHN","TWN","RUS","KAZ","MNG"), level=1, simplify=0.01)
+  # g.twn <- GADMTools::gadm_sf.loadCountries("TWN", level=0, simplify=0.01)
+  # g <- bind_rows(g.chn$sf, g.twn$sf)
+  # sf::write_sf(g, "data/boundaries/gadm_simplified2.shp")
+
+  return(sf::read_sf("data/boundaries/gadm_wneighbours_simplified.shp"))
+}
+
+data.capitals <- function(m.c){
+ read_csv(file.path("data","cities.csv")) %>%
+    filter(capital %in% c("primary","admin")) %>%
+    dplyr::select(location_name=city,
+           gadm1_name=admin_name) %>%
+    mutate(location_name=recode(location_name,
+                                "Ürümqi"="Urumqi",
+                                "Xi’an"="Xi'an")) %>%
+    left_join(m.c %>%
+                distinct(location_name, location_id, gadm1_name) %>%
+                mutate(gadm1_name=recode(gadm1_name,
+                                         "Xinjiang Uygur"="Xinjiang",
+                                         "Nei Mongol"="Inner Mongolia",
+                                         "Ningxia Hui"="Ningxia",
+                                         "Xizang"="Tibet")))
 }
 
 data.keyregions <- function(level="city"){
