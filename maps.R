@@ -246,7 +246,7 @@ map.trajs <- function(trajs, location_id, location_name, date,
       labs(title=paste0("Sources of air flowing into ", location_name),
            subtitle = subtitle,
            x='', y='',
-           caption=paste0("CREA based on ",source_legend, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
+           caption=paste0("CREA based on ",source_legend, ifelse(add_fires,", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",""),
                           "HYSPLIT parameters: ", duration_hour,"h | ",met_type," | ",height,"m." ))
 
     if(add_fires){
