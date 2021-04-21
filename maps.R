@@ -4,7 +4,8 @@ map.change_province <- function(m.change.province,
                                 width=10,
                                 height=10){
 
-  g <- data.gadm()
+  g <- data.gadm.wneighbours(level=1)
+
   m.change.province.sf <- g %>%
     # mutate(gadm1_id=tolower(GID_1)) %>%
     left_join(m.change.province,
