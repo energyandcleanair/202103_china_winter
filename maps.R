@@ -98,6 +98,159 @@ map.change_city <- function(m.change.city,
 
 }
 
+map.change_city_pols <- function(m.change.city,
+                            folder="results/maps/",
+                            width=10,
+                            height=10){
+
+  g <- data.gadm.wneighbours(level=2) #GADM2 assimilated to cities
+  l <- max(abs(m.change.city$`2021Q1_vs_2019Q1`),abs(m.change.city$`2020Q4_vs_2019Q4`),na.rm=T)
+
+  qf <- "2021Q1"
+  qi <- "2019Q1"
+
+  map_q <- function(qf, qi, filename){
+
+    # One color scale for all (before filtering for region)
+    field <- sprintf("%s_vs_%s", qf, qi)
+    m.pts <- m.change.city %>%
+      left_join(rcrea::cities(id=unique(m.change.city$location_id),
+                              with_geometry=T) %>%
+                  dplyr::select(location_id=id, geometry)) %>%
+      sf::st_as_sf() %>%
+      dplyr::rename(change=all_of(field))
+
+    m.plot <- g %>%
+      sf::st_join(m.pts) %>%
+      group_by(GID_0, GID_1, GID_2, NAME_2) %>%
+      summarise(change=mean(change, na.rm=T))
+
+
+    p <- ggplot() +
+      geom_sf(data=m.plot %>% filter(GID_0=="CHN"),
+              aes(fill=change), size=0.1) +
+      geom_sf(data=m.plot %>% filter(GID_0!="CHN"),
+              fill="#808080", size=0.1, inherit.aes = F) +
+      rcrea::theme_crea() +
+      theme(panel.background = element_rect(fill="#A0CFDF"),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank()) +
+      scale_fill_distiller(palette="RdBu",
+                           limits=c(-l,l),
+                           na.value = "#AFAFAF",
+                           labels=scales::percent,
+                           name=sprintf("%s\nvs\n%s",qf,qi)) +
+      coord_sf(xlim=c(72, 136),
+               ylim=c(17, 55),
+               expand=F) +
+      labs(title=sprintf("Change in PM2.5 levels: %s vs %s",qf,qi),
+           caption="Source: CREA")
+
+
+    ggsave(file.path(folder, filename), p,
+         width=width,
+         height=height)
+  }
+
+  map_q("2021Q1","2019Q1","change_city_polygons_Q1.png")
+  map_q("2020Q4","2019Q4","change_city_polygons_Q4.png")
+
+}
+
+map.change_city_keyregion <- function(m.change.city,
+                            folder="results/maps/",
+                            width=9,
+                            height=7){
+
+  g <- data.gadm()%>%
+    sf::st_transform(3857)
+
+  kr <- "2+26"
+  kr.name <- "2+26"
+  qf <- "2021Q1"
+  qi <- "2019Q1"
+
+
+  map_q_kr <- function(qf, qi, kr, kr.name, filename){
+
+    # One color scale for all (before filtering for region)
+    l <- max(abs(m.change.city$`2021Q1_vs_2019Q1`), abs(m.change.city$`2020Q4_vs_2019Q4`), na.rm=T)
+    margin <- 1e5 #0.5
+
+    field <- sprintf("%s_vs_%s", qf, qi)
+    m.plot <- m.change.city %>%
+      filter(keyregion2018==kr) %>%
+      left_join(rcrea::cities(id=unique(m.change.city$location_id),
+                              with_geometry=T) %>%
+                  dplyr::select(location_id=id, geometry, name)) %>%
+      sf::st_as_sf() %>%
+      rename(change=all_of(field)) %>%
+      sf::st_transform(3857)
+
+    m.plot$change_str <- paste0(round(m.plot$change*100),"%")
+    m.plot$label <- sprintf("%s\n%s", m.plot$name, m.plot$change_str)
+    m.plot$hjust <- recode(m.plot$name,
+                             "Zhengzhou"=1.2,
+                             "Hebi"=1.2,
+                             "Xianyang"=1.2,
+                             .default=0.5)
+    m.plot$vjust <- recode(m.plot$name,
+                             "Zhengzhou"=0.5,
+                             "Hebi"=0.5,
+                           "Xianyang"=0.5,
+                             .default=-0.3)
+
+    # Make width height ratio fixed by user, so that all regions look alike in doc
+    bbox <- sf::st_bbox(m.plot) + c(-margin,-margin,margin,margin)
+    wh.obs <- (bbox[3]-bbox[1])/(bbox[4]-bbox[2])
+    wh.tgt <- width / height
+    bbox.tgt <- tmaptools::bb(bbox,
+                              height=max(1,wh.obs/wh.tgt),
+                              width=max(1,wh.tgt/wh.obs),
+                              relative = T)
+    wh.tgt2 <- (bbox.tgt[3]-bbox.tgt[1])/(bbox.tgt[4]-bbox.tgt[2])
+    print(wh.tgt2)
+
+    (p <- ggplot(m.plot) +
+        geom_sf(data=g, aes(label=NAME_1), color="grey", fill="#DFDFDF", inherit.aes = F) +
+        geom_sf_text(data=sf::st_centroid(sf::st_crop(g, bbox.tgt)) %>%
+                       filter(!NAME_1 %in% c("Beijing","Tianjin")),
+                     aes(label=NAME_1), color="darkgrey", fill="transparent",inherit.aes = F) +
+        geom_sf_text(aes(label=label),
+                     vjust=m.plot$vjust,
+                     hjust=m.plot$hjust,
+                     lineheight=0.8,
+                     size=3.5) +
+        geom_sf(aes(color=change), show.legend = F) +
+        scale_color_distiller(palette="RdBu",
+                              # limits=c(-l,l),
+                              name=NULL,
+                              labels=scales::percent) +
+        coord_sf(xlim = c(bbox.tgt[1], bbox.tgt[3]),
+                 ylim = c(bbox.tgt[2], bbox.tgt[4]),
+                 expand = F)+
+        rcrea::theme_crea() +
+        theme(panel.background = element_rect(fill="#A0CFDF"),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank()) +
+        labs(title=sprintf("PM 2.5 concentration in %s: %s vs %s", kr.name, qf, qi),
+             caption="Source: CREA",
+             x=NULL, y=NULL))
+
+    ggsave(file.path(folder, filename), plot=p, width=width, height=height)
+    print(p)
+    return(p)
+  }
+
+  map_q_kr("2021Q1","2019Q1","2+26","2+26 cities","change_city_2+26_Q1.png")
+  map_q_kr("2020Q4","2019Q4","2+26","2+26 cities","change_city_2+26_Q4.png")
+  map_q_kr("2021Q1","2019Q1","YRD","YRD","change_city_yrd_Q1.png")
+  map_q_kr("2020Q4","2019Q4","YRD","YRD","change_city_yrd_Q4.png")
+  map_q_kr("2021Q1","2019Q1","Fenwei","Fenwei","change_city_fenwei_Q1.png")
+  map_q_kr("2020Q4","2019Q4","Fenwei","Fenwei","change_city_fenwei_Q4.png")
+}
+
+
 map.change_keyregion <- function(meas){
 
 }
@@ -334,3 +487,80 @@ map.trajs <- function(trajs, location_id, location_name, date,
     return(NA)
   })
 }
+
+
+map.windrose <- function(meas, weather, filename, met_type, duration_hour, height){
+
+  capitals <- data.capitals(meas)
+  date_from <- "2020-10-01"
+  date_to <- "2021-03-31"
+
+
+  hp.meas <-  capitals %>%
+    left_join(meas) %>%
+    filter(heavy_polluted) %>%
+    filter(date>=date_from) %>%
+    filter(date<=date_to)
+
+  hp.weather <- hp.meas %>%
+    distinct(location_id, location_name, date) %>%
+    left_join(weather)
+
+  g <- data.gadm()
+  g.3857 <- sf::st_transform(g, 3857)
+
+
+  ggmap::register_google(key=Sys.getenv("GOOGLE_MAP_API_KEY"))
+
+  map <- ggmap::get_map(
+    location = sf::st_bbox(g) %>% set_names(c("left","bottom","right","top")),
+    # "China",
+    zoom = 5,
+    # maptype = "terrain",
+    source="stamen"
+  )
+
+  # overwrite the bbox of the ggmap object with that from the uk map that has
+  # been transformed to 3857
+  attr(map, "bb")$ll.lat <- st_bbox(g.3857)["ymin"]
+  attr(map, "bb")$ll.lon <- st_bbox(g.3857)["xmin"]
+  attr(map, "bb")$ur.lat <- st_bbox(g.3857)["ymax"]
+  attr(map, "bb")$ur.lon <- st_bbox(g.3857)["xmax"]
+
+  m <- ggmap(map, extent = sf::st_bbox(g)) +
+    coord_sf(crs = st_crs(3857)) # force the ggplot2 map to be in 3857
+    # geom_sf(data = g, fill="transparent", inherit.aes = FALSE)
+
+
+
+  for(i in seq(nrow(capitals))){
+
+    tryCatch({
+      p <- plot.windrose(hp.meas,
+                         hp.weather,
+                         location_id=capitals$location_id[i],
+                         location_name=capitals$location_name[i])
+      # geometry <- hp.weather[hp.weather$location_id==capitals$location_id[i],"geometry"][1,] %>% pull()
+      coords <- hp.weather[hp.weather$location_id==capitals$location_id[i],"geometry"][1,] %>%
+        sf::st_as_sf() %>%
+        sf::st_transform(3857) %>%
+        st_coordinates()
+
+      x = coords[1]
+      y = coords[2]
+      size=250000
+
+      m <- m+annotation_custom(ggplotGrob(p),
+                               xmin=x-size,
+                               ymin=y-size,
+                               xmax=x+size,
+                               ymax=y+size)
+    },error=function(e){})
+  }
+
+
+  m
+
+}
+
+
