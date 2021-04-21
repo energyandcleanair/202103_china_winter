@@ -38,6 +38,33 @@ plots.change_province <- function(m.change.province,
 }
 
 
+
+plots.hp_keyregion <- function(m.hp.keyregion,
+                               folder="results/plots/",
+                               width=8,
+                               height=4,
+                               ...){
+  ggplot(m.hp.keyregion) +
+    geom_bar(aes(quarter, round(count), fill="1"),
+             stat="identity",
+             show.legend = F) +
+    facet_wrap(~keyregion2018, ...) +
+    scale_y_continuous(
+                       expand = expansion(mult=c(0,0.1),0)) +
+
+    rcrea::theme_crea() +
+    rcrea::CREAtheme.scale_fill_crea_d() +
+    theme(axis.text.x = element_text(size=6)) +
+    labs(title="Number of heavy pollution days in key regions",
+         subtitle="Average number of heavy pollution days per city per quarter",
+         caption="Source: CREA",
+         x=NULL, y=NULL)
+
+  ggsave("results/plots/hp_keyregion.png", width=width, height=height)
+}
+
+
+
 plots.sandstorm_keyregion <- function(m.storm.keyregion){
   ggplot(m.storm.keyregion) +
     geom_bar(aes(season, count, fill="1"),
