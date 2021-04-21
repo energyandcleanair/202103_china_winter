@@ -29,7 +29,7 @@ source('utils.R')
 
 date_from <- "2018-10-01"
 date_to <- "2021-03-31"
-polls <- c("pm25","pm10")
+polls <- c("pm25","pm10","no2")
 
 # Sandstorm criteria: found in desandstorm.R when comparing with official numbers
 storm_pm10_threshold <- 400
@@ -120,13 +120,14 @@ avg1 <- m.c %>%
 
 hp1 <- m.c %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions(), by=c("location_name","province")) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
   filter(quarter %in% quarters,
          !sand_storm,
          heavy_polluted) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, location_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="City without sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -144,12 +145,13 @@ avg2 <- m.c %>%
 
 hp2 <- m.c %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions(), by=c("location_name","province")) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
   filter(quarter %in% quarters,
          heavy_polluted) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, location_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="City with sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -167,13 +169,14 @@ avg3 <- m.s %>%
 
 hp3 <- m.s %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions("station"), by=c("location_id")) %>%
+  full_join(data.keyregions("station"), by=c("location_id")) %>%
   filter(quarter %in% quarters,
          heavy_polluted,
          !sand_storm) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, city_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="Station without sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -190,12 +193,13 @@ avg4 <- m.s %>%
 
 hp4 <- m.s %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions("station"), by=c("location_id")) %>%
+  full_join(data.keyregions("station"), by=c("location_id")) %>%
   filter(quarter %in% quarters,
          heavy_polluted) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, city_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="Station with sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -233,7 +237,25 @@ bind_rows(avg.official, avg2, avg1, avg4, avg3) %>%
 
 bind_rows(hp.official, hp2, hp1, hp4, hp3) %>%
   arrange(keyregion2018) %>%
+  mutate_if(is.numeric, round, digits=1) %>%
   write.csv("results/data/keyregion_methodologies_hp.csv", row.names = F, na = "-")
+
+
+m.hp.keyregion <-  m.c %>%
+  rename(province=gadm1_name) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
+  filter(quarter %in% quarters,
+         !sand_storm,
+         heavy_polluted) %>%
+  group_by(keyregion2018, location_name, quarter) %>%
+  summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
+  dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none")
+
+plots.hp_keyregion(m.hp.keyregion, width=10, nrow=1)
+write.csv(m.hp.keyregion, "results/data/heavypolluted_keyregion.csv", row.names = F, na = "-")
+
 
 # Map change
 map_change <- map.change_interpolated(m.c, res=0.1)
@@ -293,96 +315,100 @@ m.storm.keyregion <- m.c %>%
 
 write.csv(m.storm.keyregion, "results/data/sandstorm_keyregion.csv", row.names = F)
 
+
+# Trajectories ------------------------------------------------------------
+
 # back trajectories for the heavy polluted days, for the worst city in each province and for provincial capitals
 #
-# capitals <- read_csv(file.path("data","cities.csv")) %>%
-#   filter(capital %in% c("primary","admin")) %>%
-#   dplyr::select(location_name=city,
-#          gadm1_name=admin_name) %>%
-#   mutate(location_name=recode(location_name,
-#                               "Ürümqi"="Urumqi",
-#                               "Xi’an"="Xi'an")) %>%
-#   left_join(m.c %>%
-#               distinct(location_name, location_id, gadm1_name) %>%
-#               mutate(gadm1_name=recode(gadm1_name,
-#                                        "Xinjiang Uygur"="Xinjiang",
-#                                        "Nei Mongol"="Inner Mongolia",
-#                                        "Ningxia Hui"="Ningxia",
-#                                        "Xizang"="Tibet")))
-#
-# worse_cities <- m.c %>%
-#   filter(heavy_polluted,
-#          !sand_storm,
-#          date>="2020-04-01") %>%
-#   group_by(location_id, location_name, gadm1_name) %>%
-#   summarise(count=n()) %>%
-#   group_by(gadm1_name) %>%
-#   filter(count==max(count))
-#
-# location_ids <- unique(c(capitals$location_id, worse_cities$location_id))
-#
-# duration_hour=72
-# met_type="gdas1"
-# height=500
-#
-# meas.hp.trajs <- m.c %>%
-#   left_join(rcrea::cities(id=unique(m.c$location_id), with_geometry=T) %>% dplyr::select(location_id=id, geometry)) %>%
-#   filter(location_id %in% location_ids) %>%
-#   filter(heavy_polluted,
-#          !sand_storm,
-#          season=="2020-2021") %>%
-#   distinct(location_id, location_name, gadm1_name, geometry, date) %>%
-#   rowwise() %>%
-#   mutate(
-#     # m.c=list(tibble(pm25=pm25, pm10=pm10)),
-#     filename=file.path("results","plots",
-#                        sprintf("%s_%s_%s.png",
-#                                tolower(gadm1_name),
-#                                tolower(location_name),
-#                                gsub("-","",as.character(date))))
-#    )
-#
-#
-#
-# meas.hp.trajs$trajs <- creatrajs::trajs.get(
-#   dates=meas.hp.trajs$date,
-#   location_id=meas.hp.trajs$location_id,
-#   geometry=meas.hp.trajs$geometry,
-#   duration_hour=duration_hour,
-#   met_type=met_type,
-#   height=height,
-#   timezone="Asia/Shanghai",
-#   cache_folder=file.path("cache","trajs"), # Trajectories files are cached here. Won't be recomputed if exist
-#   parallel=F
-# )
-#
-#
-#
-# # Add basemap
-# meas.hp.trajs.all <-
-#   bind_rows(
-#     creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 800, zoom_level = 7) %>% mutate(buffer_km=800)
-#     # creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 500, zoom_level = 7) %>% mutate(buffer_km=500)
-#     )
-#
-# meas.hp.trajs.all$filename=file.path("results","maps","trajs",
-#                    sprintf("%s_%s_%s_%dkm.png",
-#                            tolower(meas.hp.trajs.all$gadm1_name),
-#                            tolower(meas.hp.trajs.all$location_name),
-#                            gsub("-","",as.character(meas.hp.trajs.all$date)),
-#                            meas.hp.trajs.all$buffer_km))
-#
-# pbapply::pbmapply(
-#   creatrajs::map.trajs,
-#   trajs = meas.hp.trajs.all$trajs,
-#   basemap = meas.hp.trajs.all$basemap,
-#   location_id = meas.hp.trajs.all$location_id,
-#   location_name = meas.hp.trajs.all$location_name,
-#   date=meas.hp.trajs.all$date,
-#   meas=list(NULL),
-#   duration_hour=duration_hour,
-#   met_type=met_type,
-#   height=height,
-#   filename=meas.hp.trajs.all$filename,
-#   SIMPLIFY=F)
+capitals <- read_csv(file.path("data","cities.csv")) %>%
+  filter(capital %in% c("primary","admin")) %>%
+  dplyr::select(location_name=city,
+         gadm1_name=admin_name) %>%
+  mutate(location_name=recode(location_name,
+                              "Ürümqi"="Urumqi",
+                              "Xi’an"="Xi'an")) %>%
+  left_join(m.c %>%
+              distinct(location_name, location_id, gadm1_name) %>%
+              mutate(gadm1_name=recode(gadm1_name,
+                                       "Xinjiang Uygur"="Xinjiang",
+                                       "Nei Mongol"="Inner Mongolia",
+                                       "Ningxia Hui"="Ningxia",
+                                       "Xizang"="Tibet")))
+
+worse_cities <- m.c %>%
+  filter(heavy_polluted,
+         !sand_storm,
+         date>="2020-04-01") %>%
+  group_by(location_id, location_name, gadm1_name) %>%
+  summarise(count=n()) %>%
+  group_by(gadm1_name) %>%
+  filter(count==max(count))
+
+location_ids <- unique(c(capitals$location_id, worse_cities$location_id))
+
+duration_hour=72
+met_type="gdas1"
+height=500
+
+meas.hp.trajs <- m.c %>%
+  left_join(rcrea::cities(id=unique(m.c$location_id), with_geometry=T) %>% dplyr::select(location_id=id, geometry)) %>%
+  filter(location_id %in% location_ids) %>%
+  filter(heavy_polluted,
+         !sand_storm,
+         quarter %in% c("2020Q4", "2021Q1")) %>%
+  distinct(location_id, location_name, gadm1_name, geometry, date) %>%
+  rowwise() %>%
+  mutate(
+    # m.c=list(tibble(pm25=pm25, pm10=pm10)),
+    filename=file.path("results","plots",
+                       sprintf("%s_%s_%s.png",
+                               tolower(gadm1_name),
+                               tolower(location_name),
+                               gsub("-","",as.character(date))))
+   )
+
+
+
+meas.hp.trajs$trajs <- creatrajs::trajs.get(
+  dates=meas.hp.trajs$date,
+  location_id=meas.hp.trajs$location_id,
+  geometry=meas.hp.trajs$geometry,
+  duration_hour=duration_hour,
+  met_type=met_type,
+  height=height,
+  timezone="Asia/Shanghai",
+  cache_folder=file.path("cache","trajs"), # Trajectories files are cached here. Won't be recomputed if exist
+  parallel=F
+)
+
+
+
+# Add basemap
+meas.hp.trajs.all <-
+  bind_rows(
+    creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 800, zoom_level = 7) %>% mutate(buffer_km=800),
+    creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 1200, zoom_level = 6) %>% mutate(buffer_km=1200)
+    # creatrajs::utils.attach.basemaps(meas.hp.trajs, radius_km = 500, zoom_level = 7) %>% mutate(buffer_km=500)
+    )
+
+meas.hp.trajs.all$filename=file.path("results","maps","trajs",
+                   sprintf("%s_%s_%s_%dkm.png",
+                           tolower(meas.hp.trajs.all$gadm1_name),
+                           tolower(meas.hp.trajs.all$location_name),
+                           gsub("-","",as.character(meas.hp.trajs.all$date)),
+                           meas.hp.trajs.all$buffer_km))
+
+pbapply::pbmapply(
+  creatrajs::map.trajs,
+  trajs = meas.hp.trajs.all$trajs,
+  basemap = meas.hp.trajs.all$basemap,
+  location_id = meas.hp.trajs.all$location_id,
+  location_name = meas.hp.trajs.all$location_name,
+  date=meas.hp.trajs.all$date,
+  meas=list(NULL),
+  duration_hour=duration_hour,
+  met_type=met_type,
+  height=height,
+  filename=meas.hp.trajs.all$filename,
+  SIMPLIFY=F)
 
