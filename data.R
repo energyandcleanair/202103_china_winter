@@ -73,29 +73,33 @@ data.gadm <- function(level=1){
 
 data.gadm.wneighbours <- function(level=1){
 
-  # We first simplified gadm
-  library(rmapshaper)
+  f <- file.path("data/boundaries", sprintf("gadm_wneighbours_lev%d.shp",level))
+  if(!file.exists(f)){
+    # We first simplified gadm
+    library(rmapshaper)
 
-  # Level 1 for China, 0 for other countries
-  # g.chn <- sf::read_sf(
-  #   file.path(Sys.getenv("DIR_DATA"),
-  #             sprintf("boundaries/gadm/gadm36_%d.shp",1))) %>%
-  #   filter(GID_0=="CHN")
-  #
-  # margin <- 10
-  # bbox <- sf::st_bbox(g.chn) + c(-1,-1,1,1)*margin
-  #
-  #
-  # g.other <- sf::read_sf(
-  #   file.path(Sys.getenv("DIR_DATA"),
-  #             sprintf("boundaries/gadm/gadm36_%d.shp",0))) %>%
-  #   filter(GID_0!="CHN")
-  #
-  # g.other <- g.other %>% sf::st_crop(bbox)
-  #
-  # g = rbind(g.chn, g.other)
-  # rmapshaper::ms_simplify(input = as(g, 'Spatial')) %>%
-  # st_as_sf() %>% sf::write_sf("data/boundaries/gadm_wneighbours_simplified.shp")
+    #Level 1, 2, or 3 for China, 0 for other countries
+    g.chn <- sf::read_sf(
+      file.path(Sys.getenv("DIR_DATA"),
+                sprintf("boundaries/gadm/gadm36_%d.shp", level))) %>%
+      filter(GID_0=="CHN")
+
+    margin <- 10
+    bbox <- sf::st_bbox(g.chn) + c(-1,-1,1,1)*margin
+
+
+    g.other <- sf::read_sf(
+      file.path(Sys.getenv("DIR_DATA"),
+                sprintf("boundaries/gadm/gadm36_%d.shp", 0))) %>%
+      filter(GID_0!="CHN")
+
+    g.other <- g.other %>% sf::st_crop(bbox)
+
+    g = bind_rows(g.chn, g.other)
+    rmapshaper::ms_simplify(input = as(g, 'Spatial')) %>%
+      sf::st_as_sf() %>% sf::write_sf(f)
+  }
+
 
   # require(GADMTools)
 
@@ -104,7 +108,7 @@ data.gadm.wneighbours <- function(level=1){
   # g <- bind_rows(g.chn$sf, g.twn$sf)
   # sf::write_sf(g, "data/boundaries/gadm_simplified2.shp")
 
-  return(sf::read_sf("data/boundaries/gadm_wneighbours_simplified.shp"))
+  return(sf::read_sf(f))
 }
 
 data.capitals <- function(m.c){
