@@ -253,9 +253,23 @@ m.hp.keyregion <-  m.c %>%
   summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none")
 
-plots.hp_keyregion(m.hp.keyregion, width=10, nrow=1)
+plots.hp_keyregion(m.hp.keyregion %>% filter(keyregion2018!="PRD"), width=10, nrow=1)
 write.csv(m.hp.keyregion, "results/data/heavypolluted_keyregion.csv", row.names = F, na = "-")
 
+
+m.hp.province <-  m.c %>%
+  rename(province=gadm1_name) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
+  filter(lubridate::year(date)==2020,
+         quarter %in% quarters,
+         !sand_storm,
+         heavy_polluted) %>%
+  group_by(province, location_id, month=lubridate::floor_date(date,"months")) %>%
+  summarise(count=n()) %>%
+  group_by(province, month) %>%
+  summarise(count=mean(count))
+
+plots.hp_province(m.hp.province, width=10, nrow=1)
 
 # Map change
 map_change <- map.change_interpolated(m.c, res=0.1)
