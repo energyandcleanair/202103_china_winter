@@ -14,6 +14,8 @@ library(pbapply)
 library(sp)
 library(rasterVis)
 library(gstat)
+library(RColorBrewer)
+library(tmaptools)
 
 dir.create(file.path("results","data"), recursive=T, showWarnings=F)
 dir.create(file.path("results","plots"), recursive=T, showWarnings=F)
@@ -66,9 +68,11 @@ map.change_province(m.change.province)
 
 # City
 m.change.city <- m.c %>%
+  rename(province=gadm1_name) %>%
+  left_join(data.keyregions()) %>%
   filter(quarter %in% quarters,
          !sand_storm) %>%
-  group_by(location_id, province=gadm1_name, city=location_name, quarter) %>%
+  group_by(location_id, keyregion2018, province, city=location_name, quarter) %>%
   summarise_at(c("pm25"), mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
@@ -80,6 +84,8 @@ m.change.city <- m.c %>%
 
 write.csv(m.change.city, "results/data/change_city.csv", row.names = F)
 map.change_city(m.change.city)
+map.change_city_keyregion(m.change.city)
+map.change_city_pols(m.change.city)
 
 # Key regions
 m.change.keyregion <- m.c %>%
@@ -292,6 +298,18 @@ m.storm.keyregion <- m.c %>%
 
 
 write.csv(m.storm.keyregion, "results/data/sandstorm_keyregion.csv", row.names = F)
+
+
+# weather and meas combined
+weather <- data.weather() %>%
+  dplyr::select(-c(geometry, poll, unit, source, process_id, country, timezone, value, visibility))
+
+meas <- m.c %>%
+  dplyr::select(location_id, location_name, heavy_polluted, sand_storm, pm25, pm10, date) %>%
+  left_join(data.keyregions()) %>%
+  left_join(weather)
+
+saveRDS(meas, file.path("results","data","meas.weather.RDS"))
 
 # back trajectories for the heavy polluted days, for the worst city in each province and for provincial capitals
 #
