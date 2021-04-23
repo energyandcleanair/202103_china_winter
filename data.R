@@ -33,6 +33,11 @@ data.get_meas <- function(use_cache=T, polls, date_from, date_to, level="city"){
   }
 }
 
+data.zh_en_province <- function(){
+
+
+}
+
 data.enrich_and_widen <- function(m,
                                   storm_pm10_threshold,
                                   storm_pm_ratio){
@@ -40,7 +45,11 @@ data.enrich_and_widen <- function(m,
   m$sand_storm <- (m$pm10 > storm_pm10_threshold) & (m$pm25/m$pm10 < storm_pm_ratio) # THIS AFFECTS A LOT RESULTS
   m$heavy_polluted <- (m$pm25 >= 150) | (m$pm10 >= 350) | (m$no2 > 280)
   m$quarter <- as.character(lubridate::quarter(m$date, with_year=T)) %>% gsub("\\.","Q",.)
-  m
+
+  m %>% left_join( read.csv("data/zh_en_provinces.csv") %>%
+                     rename(gadm1_id=GID_1,
+                            gadm1_name_zh=NL_NAME_1) %>%
+                     mutate_at("gadm1_id", tolower))
 }
 
 data.weather <- function(){
@@ -73,29 +82,33 @@ data.gadm <- function(level=1){
 
 data.gadm.wneighbours <- function(level=1){
 
-  # We first simplified gadm
-  library(rmapshaper)
+  f <- file.path("data/boundaries", sprintf("gadm_wneighbours_lev%d.shp",level))
+  if(!file.exists(f)){
+    # We first simplified gadm
+    library(rmapshaper)
 
-  # Level 1 for China, 0 for other countries
-  # g.chn <- sf::read_sf(
-  #   file.path(Sys.getenv("DIR_DATA"),
-  #             sprintf("boundaries/gadm/gadm36_%d.shp",1))) %>%
-  #   filter(GID_0=="CHN")
-  #
-  # margin <- 10
-  # bbox <- sf::st_bbox(g.chn) + c(-1,-1,1,1)*margin
-  #
-  #
-  # g.other <- sf::read_sf(
-  #   file.path(Sys.getenv("DIR_DATA"),
-  #             sprintf("boundaries/gadm/gadm36_%d.shp",0))) %>%
-  #   filter(GID_0!="CHN")
-  #
-  # g.other <- g.other %>% sf::st_crop(bbox)
-  #
-  # g = rbind(g.chn, g.other)
-  # rmapshaper::ms_simplify(input = as(g, 'Spatial')) %>%
-  # st_as_sf() %>% sf::write_sf("data/boundaries/gadm_wneighbours_simplified.shp")
+    #Level 1, 2, or 3 for China, 0 for other countries
+    g.chn <- sf::read_sf(
+      file.path(Sys.getenv("DIR_DATA"),
+                sprintf("boundaries/gadm/gadm36_%d.shp", level))) %>%
+      filter(GID_0=="CHN")
+
+    margin <- 10
+    bbox <- sf::st_bbox(g.chn) + c(-1,-1,1,1)*margin
+
+
+    g.other <- sf::read_sf(
+      file.path(Sys.getenv("DIR_DATA"),
+                sprintf("boundaries/gadm/gadm36_%d.shp", 0))) %>%
+      filter(GID_0!="CHN")
+
+    g.other <- g.other %>% sf::st_crop(bbox)
+
+    g = bind_rows(g.chn, g.other)
+    rmapshaper::ms_simplify(input = as(g, 'Spatial')) %>%
+      sf::st_as_sf() %>% sf::write_sf(f)
+  }
+
 
   # require(GADMTools)
 
@@ -104,7 +117,7 @@ data.gadm.wneighbours <- function(level=1){
   # g <- bind_rows(g.chn$sf, g.twn$sf)
   # sf::write_sf(g, "data/boundaries/gadm_simplified2.shp")
 
-  return(sf::read_sf("data/boundaries/gadm_wneighbours_simplified.shp"))
+  return(sf::read_sf(f))
 }
 
 data.capitals <- function(m.c){

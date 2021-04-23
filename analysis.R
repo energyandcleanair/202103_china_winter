@@ -29,6 +29,7 @@ source('maps.R')
 source('utils.R')
 
 
+
 date_from <- "2018-10-01"
 date_to <- "2021-03-31"
 polls <- c("pm25","pm10","no2")
@@ -36,6 +37,7 @@ polls <- c("pm25","pm10","no2")
 # Sandstorm criteria: found in desandstorm.R when comparing with official numbers
 storm_pm10_threshold <- 400
 storm_pm_ratio <- 0.8
+
 
 # m.c = city-level measurements
 # m.s = station-level measurements
@@ -53,7 +55,7 @@ quarters <- c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1")
 m.change.province <- m.c %>%
   filter(quarter %in% quarters,
          !sand_storm) %>%
-  group_by(gadm1_id, province=gadm1_name, quarter) %>%
+  group_by(gadm1_id, province=gadm1_name, province_zh=gadm1_name_zh, quarter) %>%
   summarise_at(c("pm25"),mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
@@ -63,7 +65,7 @@ m.change.province <- m.c %>%
     `2020Q4_vs_2019Q4`=`2020Q4`/`2019Q4`-1)
 
 write.csv(m.change.province, "results/data/change_province.csv", row.names = F)
-map.change_province(m.change.province)
+map.change_province(m.change.province, zh_en="zh")
 
 
 # City
@@ -284,6 +286,18 @@ print(map_change)
 dev.off()
 
 
+# number of heavy polluted days, excluding sand storms in 2020
+m.hp.city <- m.c %>%
+  filter(!sand_storm,
+         # date>="2020-04-01",
+         # date<"2021-04-01"
+         lubridate::year(date)==2020
+         ) %>%
+  group_by(location_id, city=location_name, province=gadm1_name) %>%
+  summarise(count=sum(heavy_polluted))
+map.hp_city_pols(m.hp.city)
+
+
 # -number of heavy polluted days, excluding sand storms, in the past 12 months up to end of March, by city and province (worst city)
 m.hp.city <- m.c %>%
   filter(heavy_polluted,
@@ -332,7 +346,7 @@ m.storm.keyregion <- m.c %>%
   summarise(count=n()) %>%
   dplyr::filter(!is.na(keyregion2018))
 
-
+plots.sandstorm_keyregion(m.storm.keyregion)
 write.csv(m.storm.keyregion, "results/data/sandstorm_keyregion.csv", row.names = F)
 
 # weather and meas combined
