@@ -342,45 +342,110 @@ map.change_interpolated <- function(meas, res=0.1, max=0.6){
 #' @export
 #'
 #' @examples
-map.trajs <- function(trajs, location_id, location_name, date,
-                      meas, filename, met_type, duration_hour, height,
-                      fires=NULL, basemap=NULL,
-                      add_fires=F, fire_raster=NULL, powerplants=NULL, add_plot=NULL, ...){
+map.trajs <- function(trajs, location_id, location_name,
+                      filename, met_type, duration_hour, height,
+                      basemap,
+                      add_no2=F,
+                      plot.width=9,
+                      plot.height=7,
+                      add_plot=NULL, ...){
 
-  if(!is.null(powerplants)){
-    powerplants$geometry <- st_centroid(powerplants$geometry)
-  }
 
   tryCatch({
-    source_legend <- if(!is.null(meas)) paste0(rcrea::source_str(unique(meas$source)), collapse=",") else ""
+
+    library(geosphere)
 
 
-    # For powerplants and active fires
-    dot_values <- c()
-    dot_colors <- c()
+    # Filter trajs with below 700m
+    alt.max <- 700
+    trajs$ID = group_indices(trajs, traj_dt_i)
+    trajs %>%
+      group_by(ID) %>%
+      arrange(desc(hour_along)) %>%
+      do(
+      mutate(.,
+             maxheight.sofar=cummax(height),
+             speed=tidyr::replace_na(distHaversine(cbind(lon, lat), cbind(lag(lon), lag(lat)))/1000,0),
+             maxspeed.sofar=cummax(speed))
+      ) %>%
+      filter(maxheight.sofar <= alt.max,
+             maxspeed.sofar <= 40) %>%
+      filter(lubridate::hour(date) %in% 3:21) %>%
+      sf::st_as_sf(coords=c("lon","lat")) %>%
+      sf::st_set_crs(4326) -> t
 
-    # Get measurements values in subtitle
-    subtitle_poll <- ifelse(!is.null(meas),
-                            paste0(rcrea::poll_str(meas$poll)," level: ",round(meas$value)," ",meas$unit,collapse=". "),
-                            "")
 
-    subtitle <- paste0(date, ". ", subtitle_poll)
+    # Make width height ratio fixed by user, so that all regions look alike in doc
+    margin <- 0.2
+    bb <- sf::st_bbox(t) + c(-margin,-margin,margin,margin)
+    wh.obs <- (bb[3]-bb[1])/(bb[4]-bb[2])
+    wh.tgt <- plot.width / plot.height
+    bb.tgt <- tmaptools::bb(bb,
+                              height=max(1,wh.obs/wh.tgt),
+                              width=max(1,wh.tgt/wh.obs),
+                              relative = T)
 
-    m <- ggmap(basemap) +
-      coord_cartesian() +
+    bb.tgt.3857 <- sf::st_transform(sf::st_as_sfc(bb.tgt), 3857) %>%
+      sf::st_bbox()
+
+    ggmap::register_google(key=Sys.getenv("GOOGLE_MAP_API_KEY"))
+
+    basemap <- ggmap::get_map(
+      location = bb.tgt %>% set_names(c("left","bottom","right","top")),
+      zoom = 6,
+      # maptype = "terrain",
+      source="stamen"
+    )
+
+    # overwrite the bbox of the ggmap object with that from the 3857 map
+    # bb <- attr(map, "bb")
+    # bb.3857 <- ggmap::make_bbox(bb)
+    attr(basemap, "bb")$ll.lat <- bb.tgt.3857["ymin"]
+    attr(basemap, "bb")$ll.lon <- bb.tgt.3857["xmin"]
+    attr(basemap, "bb")$ur.lat <- bb.tgt.3857["ymax"]
+    attr(basemap, "bb")$ur.lon <- bb.tgt.3857["xmax"]
+
+
+    m <- ggmap(basemap, extent=bb.tgt, padding=0) +
+      coord_sf(crs = st_crs(3857))
+
+
+
+    t.3857 <- t %>%
+      sf::st_transform(3857) %>%
+      rowwise() %>%
+      mutate(lat=sf::st_coordinates(geometry)[[2]],
+             lon=sf::st_coordinates(geometry)[[1]]
+      )
+
+    if(add_no2){
+      no2_raster <- raster::raster("data/chinaNO2Winter2020_10km.tif")
+      no2_raster_3857 <- raster::projectRaster(no2_raster, crs=3857)
+      no2_df <- as.data.frame(no2_raster_3857, xy = TRUE)
+      m <- m + geom_raster(data = no2_df,
+                           aes(x = x, y = y, fill = chinaNO2Winter2020_10km), alpha=0.4) +
+        scale_fill_distiller(palette="RdBu")
+    }
+
+    m <- m +
+      # coord_cartesian(
+      #   xlim=c(min(trajs.filtered$lon)-margin, max(trajs.filtered$lon)+margin),
+      #   ylim=c(min(trajs.filtered$lat)-margin, max(trajs.filtered$lat)+margin),
+      #
+      # ) +
       # geom_point(data=wri_power %>% dplyr::filter(country=="IDN"), inherit.aes = F, aes(x=longitude,y=latitude),
       #            shape=2, stroke=1.5, color='darkred') +
       # geom_point(data=ct %>% dplyr::filter(country=="Indonesia"), inherit.aes = F, aes(x=lng,y=lat),
       #            shape=2, stroke=1.5, color='darkred') +
 
       # Cluster trajectories
-      geom_path(data = trajs %>%
-                  dplyr::arrange(hour_along) %>%
-                  mutate(subcluster=paste(traj_dt_i, hour_along %/% 8)),
-                arrow = ggplot2::arrow(angle=18, length=ggplot2::unit(0.1,"inches")),
-                aes(x = lon, y = lat, group=subcluster), color="darkred", alpha=0.6) +
+      # geom_path(data = trajs.filtered %>%
+      #             dplyr::arrange(hour_along) %>%
+      #             mutate(subcluster=paste(traj_dt_i, hour_along %/% 8)),
+      #           arrow = ggplot2::arrow(angle=18, length=ggplot2::unit(0.1,"inches")),
+      #           aes(x = lon, y = lat, group=subcluster), color="darkred", alpha=0.6) +
 
-      geom_path(data = trajs,
+      geom_path(data = t.3857,
                 aes(x = lon, y = lat, group=traj_dt_i), color="darkred", alpha=0.6) +
 
       # geom_line(data = trajs_meas %>% dplyr::filter(value>=threshold) , aes(x = lon, y = lat, group=traj_dt_i), alpha=0.6, color='darkred')+
@@ -397,93 +462,30 @@ map.trajs <- function(trajs, location_id, location_name, date,
                      legend.box.margin=margin(-20,0,10,0)) +
       scale_shape_manual(name="Sector", values=c(0,1,2,3,4,5)) +
       labs(title=paste0("Sources of air flowing into ", location_name),
-           subtitle = subtitle,
            x='', y='',
-           caption=paste0("CREA based on ",source_legend, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
+           caption=paste0("CREA based on MEE and HYSPLIT.\n",
                           "HYSPLIT parameters: ", duration_hour,"h | ",met_type," | ",height,"m." ))
 
-    if(add_fires){
-
-      if(!is.null(fire_raster)){
-        bb <- ggmap::bb2bbox(attr(basemap, "bb"))
-        bb <- as.numeric(bb)
-        names(bb) <- c("xmin","ymin","xmax","ymax")
-        crop <- sf::st_as_sfc(st_bbox(bb)) %>% sf::st_set_crs(4326) %>% sf::st_transform(crs=attr(fire_raster,"crs"))
-        r.cropped <- raster::crop(fire_raster, as(crop, 'Spatial'))
-
-        # r.cropped.max <- calc(r.cropped, function(x) max(x, na.rm = TRUE))
-        fire_pol <- do.call("rbind", lapply(unstack(r.cropped),
-                                            FUN=function(x){tryCatch({p <- rasterToPolygons(x); names(p)="fire"; p},
-                                                                     error=function(c){NULL})}))
-
-
-        if(!is.null(fire_pol)){
-          m <- m + geom_sf(data=st_as_sf(fire_pol),
-                           inherit.aes = F,
-                           fill="blue",
-                           color="blue")
-        }
-      }
-
-      if(nrow(fires %>% filter(!is.na(acq_date)))>0){
-        frp.min <- 0
-        frp.max <- 8
-
-        fires$frp <- min(fires$frp, frp.max)
-        fires$frp <- max(fires$frp, frp.min)
-
-        m <- m + geom_point(data=fires, inherit.aes = F,
-                            aes(x=st_coordinates(geometry.fire)[,1],
-                                y=st_coordinates(geometry.fire)[,2],
-                                size=frp,
-                                color="Active fire"),
-                            fill="orange",
-                            shape="triangle",
-                            stroke=1,
-                            alpha=0.8,
-                            position="jitter") +
-          scale_size_continuous(range=c(1,9), limits=c(frp.min, frp.max), guide="none")
-
-        dot_values <- c(dot_values, "Active fire")
-        dot_colors <- c(dot_colors, "red")
-      }
-    }
-
-    if(!is.null(powerplants)){
-
-      m <- m + geom_point(data=powerplants, inherit.aes = F,
-                          aes(x=st_coordinates(st_centroid(geometry))[,1],
-                              y=st_coordinates(st_centroid(geometry))[,2],
-                              size=frp,
-                              color="Thermal power plant"),
-                          shape="triangle",
-                          size=2,
-                          stroke=1,
-                          alpha=0.8,
-                          position="jitter", show.legend = T)
-
-      dot_values <- c(dot_values, "Thermal power plant")
-      dot_colors <- c(dot_colors, "black")
-    }
-
-    m <- m +
-      scale_color_manual(name=NULL,
-                         values=dot_colors,
-                         breaks=dot_values)
 
     if(!is.null(add_plot)){
       m <- m + add_plot
     }
 
 
+
+    m <- m +
+      coord_cartesian(xlim = c(bb.tgt.3857[1], bb.tgt.3857[3]),
+               ylim = c(bb.tgt.3857[2], bb.tgt.3857[4]),
+               expand = F)
+
     ggsave(plot=m,
            filename = filename,
-           width=8,
-           height=7)
+           width=plot.width,
+           height=plot.height)
 
     return(filename)
   }, error=function(c){
-    warning(paste("Error on  ", location_id, date))
+    warning(paste("Error on  ", location_id))
     return(NA)
   })
 }
@@ -531,7 +533,15 @@ map.windrose <- function(meas, weather, filename, met_type, duration_hour, heigh
     coord_sf(crs = st_crs(3857)) # force the ggplot2 map to be in 3857
     # geom_sf(data = g, fill="transparent", inherit.aes = FALSE)
 
+  no2_raster <-
+    raster::raster("data/chinaNO2Winter2020_10km.tif")
 
+  no2_raster_3857 <- raster::projectRaster(no2_raster, crs=3857)
+
+  no2_df <- as.data.frame(no2_raster_3857, xy = TRUE)
+  m <- m + geom_raster(data = no2_df,
+              aes(x = x, y = y, fill = chinaNO2Winter2020_10km), alpha=0.8) +
+    scale_fill_distiller(palette="RdBu")
 
   for(i in seq(nrow(capitals))){
 
@@ -555,7 +565,7 @@ map.windrose <- function(meas, weather, filename, met_type, duration_hour, heigh
                                ymin=y-size,
                                xmax=x+size,
                                ymax=y+size)
-    },error=function(e){})
+    },error=function(e){print(e)})
   }
 
 
