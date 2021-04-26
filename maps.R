@@ -1,56 +1,81 @@
 
 map.change_province <- function(m.change.province,
                                 folder="results/maps/",
+                                zh_en="en",
                                 width=10,
-                                height=10){
+                                height=7){
 
-  g <- data.gadm()
-  m.change.province.sf <- g %>%
-    # mutate(gadm1_id=tolower(GID_1)) %>%
-    left_join(m.change.province,
-              by=c("NAME_1"="province"))
+  g <- data.gadm.wneighbours(level=1)
+  l <- max(abs(m.change.province$`2021Q1_vs_2019Q1`),abs(m.change.province$`2020Q4_vs_2019Q4`))
 
-  l <- max(abs(m.change.province.sf$`2021Q1_vs_2019Q1`),abs(m.change.province.sf$`2020Q4_vs_2019Q4`))
+  qf <- "2021Q1"
+  qi <- "2019Q1"
 
-  p1 <- ggplot(m.change.province.sf) +
-    geom_sf(aes(fill=`2021Q1_vs_2019Q1`)) +
-    geom_sf_text(aes(label=ifelse(is.na(`2021Q1_vs_2019Q1`),
-                              "",
-                              paste0(round(`2021Q1_vs_2019Q1`*100),"%"))),
-                 size=3) +
-    scale_fill_distiller(palette="RdBu",
-                         limits=c(-l,l),
-                         name=NULL,
-                         labels=scales::percent) +
-    rcrea::theme_crea() +
-    labs(title="PM 2.5 concentration: 2021Q1 vs 2019Q1",
-         y=NULL,
-         x=NULL)
+  map_q <- function(qf, qi, filename){
 
-  ggsave(file.path(folder,"change_province_q1.png"), p1,
-         width=width,
-         height=height)
+    # One color scale for all (before filtering for region)
+    field <- sprintf("%s_vs_%s", qf, qi)
+    m.plot <- g %>%
+      left_join(m.change.province,
+                by=c("NAME_1"="province")) %>%
+      dplyr::rename(change=all_of(field))
 
 
-  p4 <- ggplot(m.change.province.sf) +
-    geom_sf(aes(fill=`2020Q4_vs_2019Q4`)) +
-    geom_sf_text(aes(label=ifelse(is.na(`2020Q4_vs_2019Q4`),
-                                  "",
-                                  paste0(round(`2020Q4_vs_2019Q4`*100),"%"))),
-                 size=3) +
-    scale_fill_distiller(palette="RdBu",
-                         limits=c(-l,l),
-                         name=NULL,
-                         labels=scales::percent) +
-    rcrea::theme_crea() +
-    labs(title="PM 2.5 concentration: 2020Q4 vs 2019Q4",
-         y=NULL,
-         x=NULL)
+    m.plot$nudge_x <- recode(m.plot$NAME_1,
+                           "Gansu"= 1,
+                           "Tianjin"=1,
+                           "Guizhou"=1,
+                           "Nei Mongol"=-2,
+                           .default=0)
+    m.plot$nudge_y <- recode(m.plot$NAME_1,
+                           "Gansu"=-3,
+                           "Hebei"=-1,
+                           "Guangdong"=0.5,
+                           "Nei Mongol"=-1,
+                           "Heilongjiang"=-1,
+                           .default=0)
 
-  ggsave(file.path(folder,"change_province_q4.png"), p4,
-         width=width,
-         height=height)
 
+    p <- ggplot(m.plot) +
+      geom_sf(data=m.plot %>% filter(GID_0=="CHN"),
+              aes(fill=change), size=0.1) +
+      geom_sf(data=m.plot %>% filter(GID_0!="CHN"),
+              fill="#808080", size=0.1, inherit.aes = F) +
+      geom_sf_text(aes(label=ifelse(is.na(change),
+                                    "",
+                                    paste0(NAME_1,"\n",
+                                           ifelse(change>0,"+",""),
+                                           round(change*100),"%"))),
+
+                      nudge_x =m.plot$nudge_x,
+                      nudge_y= m.plot$nudge_y,
+                   size=2.5,
+                   lineheight=0.8) +
+      rcrea::theme_crea() +
+      labs(title=sprintf("PM 2.5 concentration: %s vs %s",qf,qi),
+           y=NULL,
+           x=NULL,
+           caption="Source: CREA") +
+      rcrea::theme_crea() +
+      theme(panel.background = element_rect(fill="#A0CFDF"),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank()) +
+      scale_fill_distiller(palette="RdBu",
+                           limits=c(-l,l),
+                           na.value = "#AFAFAF",
+                           labels=scales::percent,
+                           name=sprintf("%s\nvs\n%s",qf,qi)) +
+      coord_sf(xlim=c(72, 136),
+               ylim=c(17, 55),
+               expand=F)
+
+    ggsave(file.path(folder, filename), p,
+           width=width,
+           height=height)
+  }
+
+  map_q("2021Q1","2019Q1","change_province_q1.png")
+  map_q("2020Q4","2019Q4","change_province_q4.png")
 }
 
 map.change_city <- function(m.change.city,
@@ -157,12 +182,73 @@ map.change_city_pols <- function(m.change.city,
 
 }
 
+map.hp_city_pols <- function(m.hp.city,
+                                 folder="results/maps/",
+                                 width=10,
+                                 height=7){
+
+  g <- data.gadm.wneighbours(level=2) #GADM2 assimilated to cities
+  # l <- max(abs(m.change.city$`2021Q1_vs_2019Q1`),abs(m.change.city$`2020Q4_vs_2019Q4`),na.rm=T)
+
+  map_q <- function(filename){
+
+    # One color scale for all (before filtering for region)
+
+    m.pts <- m.hp.city %>%
+      left_join(rcrea::cities(id=unique(m.change.city$location_id),
+                              with_geometry=T) %>%
+                  dplyr::select(location_id=id, geometry)) %>%
+      sf::st_as_sf()
+
+    m.plot <- g %>%
+      sf::st_join(m.pts) %>%
+      group_by(GID_0, GID_1, GID_2, NAME_2) %>%
+      summarise(count=max(count, na.rm=T)) %>%
+      mutate(count=cut(count,
+                       breaks=c(-1,0,5,10,15,20,25,Inf),
+                       labels=c("0","1-5","6-10","11-15",
+                                "16-20","21-25", ">25")))
+
+
+    p <- ggplot() +
+      geom_sf(data=m.plot %>% filter(GID_0=="CHN"),
+              aes(fill=count), size=0.1) +
+      geom_sf(data=m.plot %>% filter(GID_0!="CHN"),
+              fill="#808080", size=0.1, inherit.aes = F) +
+      rcrea::theme_crea() +
+      theme(panel.background = element_rect(fill="#A0CFDF"),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank()) +
+      scale_fill_brewer(palette="RdYlBu",
+                        direction = -1,
+                           # limits=c(-l,l),
+                           na.value = "#AFAFAF",
+                        name=NULL,
+                           # labels=scales::percent,
+                           # name=sprintf("%s\nvs\n%s",qf,qi)
+                           ) +
+      coord_sf(xlim=c(72, 136),
+               ylim=c(17, 55),
+               expand=F) +
+      labs(
+        # title=sprintf("Number of heavy pollution days in March 2020 - March 2021"),
+           caption="Source: CREA")
+
+    ggsave(file.path(folder, filename), p,
+           width=width,
+           height=height)
+  }
+
+  map_q("hp_city.png")
+
+}
+
 map.change_city_keyregion <- function(m.change.city,
                             folder="results/maps/",
                             width=9,
                             height=7){
 
-  g <- data.gadm()%>%
+  g <- data.gadm.wneighbours(lev=2) %>%
     sf::st_transform(3857)
 
   kr <- "2+26"
@@ -188,17 +274,8 @@ map.change_city_keyregion <- function(m.change.city,
       sf::st_transform(3857)
 
     m.plot$change_str <- paste0(round(m.plot$change*100),"%")
-    m.plot$label <- sprintf("%s\n%s", m.plot$name, m.plot$change_str)
-    m.plot$hjust <- recode(m.plot$name,
-                             "Zhengzhou"=1.2,
-                             "Hebi"=1.2,
-                             "Xianyang"=1.2,
-                             .default=0.5)
-    m.plot$vjust <- recode(m.plot$name,
-                             "Zhengzhou"=0.5,
-                             "Hebi"=0.5,
-                           "Xianyang"=0.5,
-                             .default=-0.3)
+    m.plot$label <- sprintf("%s\n%s%s", m.plot$name, ifelse(m.plot$change>0,"+",""), m.plot$change_str)
+
 
     # Make width height ratio fixed by user, so that all regions look alike in doc
     bbox <- sf::st_bbox(m.plot) + c(-margin,-margin,margin,margin)
@@ -211,19 +288,49 @@ map.change_city_keyregion <- function(m.change.city,
     wh.tgt2 <- (bbox.tgt[3]-bbox.tgt[1])/(bbox.tgt[4]-bbox.tgt[2])
     print(wh.tgt2)
 
-    (p <- ggplot(m.plot) +
-        geom_sf(data=g, aes(label=NAME_1), color="grey", fill="#DFDFDF", inherit.aes = F) +
-        geom_sf_text(data=sf::st_centroid(sf::st_crop(g, bbox.tgt)) %>%
-                       filter(!NAME_1 %in% c("Beijing","Tianjin")),
-                     aes(label=NAME_1), color="darkgrey", fill="transparent",inherit.aes = F) +
-        geom_sf_text(aes(label=label),
-                     vjust=m.plot$vjust,
-                     hjust=m.plot$hjust,
-                     lineheight=0.8,
-                     size=3.5) +
-        geom_sf(aes(color=change), show.legend = F) +
+    m.plot.g <- g %>% sf::st_join(m.plot)
+
+    m.plot.g$nudge_x <- recode(m.plot.g$name,
+                             "Wuhu"=0.4,
+                             .default=0,
+                             .missing=0) * 0.5e5
+    m.plot.g$nudge_y <- recode(m.plot.g$name,
+                               "Xianyang"=-0.5,
+                               "Wuhu"=0.1,
+                             "Wuxi"=0.1,
+                             "Zhenjiang"=0.2,
+                             .default=0,
+                             .missing = 0) * 0.5e5
+
+
+    (p <- ggplot(m.plot.g) +
+        geom_sf(aes(fill=change),
+                color="grey",
+                inherit.aes = F) +
+        geom_sf_text(
+          # data=sf::st_centroid(sf::st_crop(g, bbox.tgt)),
+                        # filter(!NAME_2 %in% c("Beijing","Tianjin")),
+          aes(label=label),
+          size=3.5,
+          lineheight=0.8,
+          nudge_x = m.plot.g$nudge_x,
+          nudge_y = m.plot.g$nudge_y,
+          # color="darkgrey",
+          fill="transparent",
+          inherit.aes = F) +
+
+          # geom_sf_text(aes(label=label),
+          #            # vjust=m.plot$vjust,
+          #            # hjust=m.plot$hjust,
+          #            lineheight=0.8,
+          #            size=3.5) +
+        # geom_sf(aes(color=change), show.legend = F) +
+        scale_fill_distiller(palette="RdBu",
+                              limits=c(-l,l),
+                              name=NULL,
+                              labels=scales::percent) +
         scale_color_distiller(palette="RdBu",
-                              # limits=c(-l,l),
+                              limits=c(-l,l),
                               name=NULL,
                               labels=scales::percent) +
         coord_sf(xlim = c(bbox.tgt[1], bbox.tgt[3]),
@@ -242,8 +349,8 @@ map.change_city_keyregion <- function(m.change.city,
     return(p)
   }
 
-  map_q_kr("2021Q1","2019Q1","2+26","2+26 cities","change_city_2+26_Q1.png")
-  map_q_kr("2020Q4","2019Q4","2+26","2+26 cities","change_city_2+26_Q4.png")
+  map_q_kr("2021Q1","2019Q1","2+26","2+26 cities","change_city_226_Q1.png")
+  map_q_kr("2020Q4","2019Q4","2+26","2+26 cities","change_city_226_Q4.png")
   map_q_kr("2021Q1","2019Q1","YRD","YRD","change_city_yrd_Q1.png")
   map_q_kr("2020Q4","2019Q4","YRD","YRD","change_city_yrd_Q4.png")
   map_q_kr("2021Q1","2019Q1","Fenwei","Fenwei","change_city_fenwei_Q1.png")

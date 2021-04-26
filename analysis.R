@@ -29,13 +29,15 @@ source('maps.R')
 source('utils.R')
 
 
+
 date_from <- "2018-10-01"
 date_to <- "2021-03-31"
-polls <- c("pm25","pm10")
+polls <- c("pm25","pm10","no2")
 
 # Sandstorm criteria: found in desandstorm.R when comparing with official numbers
 storm_pm10_threshold <- 400
 storm_pm_ratio <- 0.8
+
 
 # m.c = city-level measurements
 # m.s = station-level measurements
@@ -53,7 +55,7 @@ quarters <- c("2018Q4","2019Q1","2020Q4","2021Q1","2019Q4","2020Q1")
 m.change.province <- m.c %>%
   filter(quarter %in% quarters,
          !sand_storm) %>%
-  group_by(gadm1_id, province=gadm1_name, quarter) %>%
+  group_by(gadm1_id, province=gadm1_name, province_zh=gadm1_name_zh, quarter) %>%
   summarise_at(c("pm25"),mean, na.rm=T) %>%
   tidyr::spread("quarter","pm25") %>%
   mutate(
@@ -63,7 +65,7 @@ m.change.province <- m.c %>%
     `2020Q4_vs_2019Q4`=`2020Q4`/`2019Q4`-1)
 
 write.csv(m.change.province, "results/data/change_province.csv", row.names = F)
-map.change_province(m.change.province)
+map.change_province(m.change.province, zh_en="zh")
 
 
 # City
@@ -126,13 +128,14 @@ avg1 <- m.c %>%
 
 hp1 <- m.c %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions(), by=c("location_name","province")) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
   filter(quarter %in% quarters,
          !sand_storm,
          heavy_polluted) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, location_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="City without sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -150,12 +153,13 @@ avg2 <- m.c %>%
 
 hp2 <- m.c %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions(), by=c("location_name","province")) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
   filter(quarter %in% quarters,
          heavy_polluted) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, location_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="City with sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -173,13 +177,14 @@ avg3 <- m.s %>%
 
 hp3 <- m.s %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions("station"), by=c("location_id")) %>%
+  full_join(data.keyregions("station"), by=c("location_id")) %>%
   filter(quarter %in% quarters,
          heavy_polluted,
          !sand_storm) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, city_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="Station without sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -196,12 +201,13 @@ avg4 <- m.s %>%
 
 hp4 <- m.s %>%
   rename(province=gadm1_name) %>%
-  left_join(data.keyregions("station"), by=c("location_id")) %>%
+  full_join(data.keyregions("station"), by=c("location_id")) %>%
   filter(quarter %in% quarters,
          heavy_polluted) %>%
-  distinct(keyregion2018, quarter, date) %>%
-  group_by(keyregion2018, quarter) %>%
+  group_by(keyregion2018, city_name, quarter) %>%
   summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
   dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none") %>%
   mutate(method="Station with sandstorm") %>%
   tidyr::spread("quarter","count")
@@ -239,13 +245,57 @@ bind_rows(avg.official, avg2, avg1, avg4, avg3) %>%
 
 bind_rows(hp.official, hp2, hp1, hp4, hp3) %>%
   arrange(keyregion2018) %>%
+  mutate_if(is.numeric, round, digits=1) %>%
   write.csv("results/data/keyregion_methodologies_hp.csv", row.names = F, na = "-")
+
+
+m.hp.keyregion <-  m.c %>%
+  rename(province=gadm1_name) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
+  filter(quarter %in% quarters,
+         !sand_storm,
+         heavy_polluted) %>%
+  group_by(keyregion2018, location_name, quarter) %>%
+  summarise(count=n()) %>%
+  group_by(keyregion2018, quarter) %>%
+  summarise(count=mean(count)) %>%
+  dplyr::filter(!is.na(keyregion2018) & keyregion2018!="none")
+
+plots.hp_keyregion(m.hp.keyregion %>% filter(keyregion2018!="PRD"), width=10, nrow=1)
+write.csv(m.hp.keyregion, "results/data/heavypolluted_keyregion.csv", row.names = F, na = "-")
+
+
+m.hp.province <-  m.c %>%
+  rename(province=gadm1_name) %>%
+  full_join(data.keyregions(), by=c("location_name","province")) %>%
+  filter(lubridate::year(date)==2020,
+         quarter %in% quarters,
+         !sand_storm,
+         heavy_polluted) %>%
+  group_by(province, location_id, month=lubridate::floor_date(date,"months")) %>%
+  summarise(count=n()) %>%
+  group_by(province, month) %>%
+  summarise(count=mean(count))
+
+plots.hp_province(m.hp.province, width=10, nrow=1)
 
 # Map change
 map_change <- map.change_interpolated(m.c, res=0.1)
 png("results/maps/map_change_interpolated.png", width = 1200, height=600)
 print(map_change)
 dev.off()
+
+
+# number of heavy polluted days, excluding sand storms in 2020
+m.hp.city <- m.c %>%
+  filter(!sand_storm,
+         # date>="2020-04-01",
+         # date<"2021-04-01"
+         lubridate::year(date)==2020
+         ) %>%
+  group_by(location_id, city=location_name, province=gadm1_name) %>%
+  summarise(count=sum(heavy_polluted))
+map.hp_city_pols(m.hp.city)
 
 
 # -number of heavy polluted days, excluding sand storms, in the past 12 months up to end of March, by city and province (worst city)
@@ -296,9 +346,8 @@ m.storm.keyregion <- m.c %>%
   summarise(count=n()) %>%
   dplyr::filter(!is.na(keyregion2018))
 
-
+plots.sandstorm_keyregion(m.storm.keyregion)
 write.csv(m.storm.keyregion, "results/data/sandstorm_keyregion.csv", row.names = F)
-
 
 # weather and meas combined
 weather <- data.weather() %>%
@@ -312,11 +361,15 @@ meas <- m.c %>%
 saveRDS(meas, file.path("results","data","meas.weather.RDS"))
 
 
+<<<<<<< HEAD
 
 #  Windrose ---------------------------------------------------------------
 
 map.windrose(meas=m.c, weather, filename="test.png", met_type="", duration_hour="", height="")
 
+=======
+# Trajectories ------------------------------------------------------------
+>>>>>>> 695b3515d2102f0a42b0172e528ece913efbbd8d
 
 # back trajectories for the heavy polluted days, for the worst city in each province and for provincial capitals
 #
@@ -350,10 +403,8 @@ duration_hour=72
 met_type="gdas1"
 height=50
 
-
 city.locations <- sf::st_as_sf(rcrea::cities(id=unique(m.c$location_id), with_geometry=T) %>% dplyr::select(location_id=id, geometry))
 sf::st_geometry(city.locations)[city.locations$location_id=="beijing_chn.2_1_cn"] = st_point(c(116.4074,39.9042))
-
 
 meas.hp.trajs <- m.c %>%
   left_join(city.locations) %>%
